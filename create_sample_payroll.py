@@ -11,6 +11,7 @@ def create_sample_payroll_excel():
     """Create a sample payroll Excel file matching the expected format."""
     
     wb = Workbook()
+    
     ws = wb.active
     
     # Header rows
