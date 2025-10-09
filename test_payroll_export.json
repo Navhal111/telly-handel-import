@@ -1,0 +1,98 @@
+{
+  "file_info": {
+    "file_name": "sample_payroll.xlsx",
+    "processing_date": "2025-10-09T18:21:41.567863",
+    "total_rows": 11,
+    "total_columns": 10
+  },
+  "header_info": {
+    "date": "09-10-2025",
+    "company_name": "LIGHT",
+    "account": "PEAPULE BANK OF UNITE",
+    "narration": "PEAPULE BANK OF UNITE"
+  },
+  "employee_payroll_data": [
+    {
+      "employee_no": "1",
+      "employee_name": "Ritesh",
+      "salary_components": {
+        "BASIC": 2200000.0,
+        "HRA": 440000.0,
+        "MEDICAL": 660000.0,
+        "RESPONSIBILITY": 1000000.0,
+        "FUEL": 250000.0,
+        "ZSSF @ 7%": 154000.0,
+        "ZHSF @ 3.5%": 154000.0,
+        "PAYE": 823700.0
+      },
+      "total_gross_salary": 4550000.0
+    },
+    {
+      "employee_no": "2",
+      "employee_name": "Milan",
+      "salary_components": {
+        "BASIC": 4200000.0,
+        "HRA": 140000.0,
+        "MEDICAL": 98000.0,
+        "RESPONSIBILITY": 1000000.0,
+        "FUEL": 0.0,
+        "ZSSF @ 7%": 67000.0,
+        "ZHSF @ 3.5%": 98250.0,
+        "PAYE": 563100.0
+      },
+      "total_gross_salary": 5438000.0
+    },
+    {
+      "employee_no": "3",
+      "employee_name": "John",
+      "salary_components": {
+        "BASIC": 1800000.0,
+        "HRA": 360000.0,
+        "MEDICAL": 540000.0,
+        "RESPONSIBILITY": 800000.0,
+        "FUEL": 200000.0,
+        "ZSSF @ 7%": 126000.0,
+        "ZHSF @ 3.5%": 126000.0,
+        "PAYE": 690000.0
+      },
+      "total_gross_salary": 3700000.0
+    },
+    {
+      "employee_no": "4",
+      "employee_name": "Sarah",
+      "salary_components": {
+        "BASIC": 3500000.0,
+        "HRA": 120000.0,
+        "MEDICAL": 85000.0,
+        "RESPONSIBILITY": 900000.0,
+        "FUEL": 0.0,
+        "ZSSF @ 7%": 58000.0,
+        "ZHSF @ 3.5%": 85500.0,
+        "PAYE": 485000.0
+      },
+      "total_gross_salary": 4605000.0
+    },
+    {
+      "employee_no": "5",
+      "employee_name": "Mike",
+      "salary_components": {
+        "BASIC": 2800000.0,
+        "HRA": 560000.0,
+        "MEDICAL": 420000.0,
+        "RESPONSIBILITY": 1200000.0,
+        "FUEL": 300000.0,
+        "ZSSF @ 7%": 196000.0,
+        "ZHSF @ 3.5%": 196000.0,
+        "PAYE": 1050000.0
+      },
+      "total_gross_salary": 5280000.0
+    }
+  ],
+  "summary": {
+    "total_employees": 5,
+    "total_gross_salary": 23573000.0,
+    "average_salary": 4714600.0,
+    "employee_data_start_row": 6,
+    "validation_warnings": []
+  }
+}

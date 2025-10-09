@@ -1,0 +1,68 @@
+{
+  "file_info": {
+    "file_name": "sample_attendance.xlsx",
+    "processing_date": "2025-10-09T18:21:41.550472",
+    "total_rows": 13,
+    "total_columns": 4
+  },
+  "header_info": {
+    "date": "09-10-2025",
+    "company_name": "LIGHT",
+    "narration": "Test attendance"
+  },
+  "employee_data": [
+    {
+      "employee_no": "1",
+      "employee_name": "Ritesh",
+      "attendance_type": "Present",
+      "attendance_days": "23"
+    },
+    {
+      "employee_no": "2",
+      "employee_name": "Milan",
+      "attendance_type": "Absent",
+      "attendance_days": "22"
+    },
+    {
+      "employee_no": "3",
+      "employee_name": "Anil",
+      "attendance_type": "Overtime @ 1.25",
+      "attendance_days": "23"
+    },
+    {
+      "employee_no": "4",
+      "employee_name": "Utkarsh",
+      "attendance_type": "Overtime @ 1.50",
+      "attendance_days": "12"
+    },
+    {
+      "employee_no": "5",
+      "employee_name": "John",
+      "attendance_type": "Present",
+      "attendance_days": "25"
+    },
+    {
+      "employee_no": "6",
+      "employee_name": "Sarah",
+      "attendance_type": "Half Day",
+      "attendance_days": "15"
+    },
+    {
+      "employee_no": "7",
+      "employee_name": "Mike",
+      "attendance_type": "Overtime @ 1.25",
+      "attendance_days": "28"
+    },
+    {
+      "employee_no": "8",
+      "employee_name": "Lisa",
+      "attendance_type": "Present",
+      "attendance_days": "22"
+    }
+  ],
+  "summary": {
+    "total_employees": 8,
+    "employee_data_start_row": 5,
+    "validation_warnings": []
+  }
+}
