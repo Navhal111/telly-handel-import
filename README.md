@@ -1,8 +1,17 @@
 # Excel File Processor - Attendance & Payroll
 
-A modern Python desktop application for processing Excel files containing attendance and payroll data with intelligent structure recognition and data extraction.
+A modern Python desktop application for processing Excel files containing attendance and payroll data with intelligent structure recognition and data extraction. Now includes **Tally ERP integration** for seamless company selection and data synchronization.
 
 ## Features
+
+### 🏢 **Tally Integration**
+
+- **Company Selection**: Automatically fetches company list from Tally ERP
+- **API Integration**: Connects to Tally via HTTP API (`http://localhost:9000/`)
+- **Company Display**: Shows selected company throughout the application
+- **Dynamic Company Switching**: Easy company selection with refresh capability
+
+### 📊 **Excel Processing**
 
 - **Modern GUI Interface**: Clean, professional design with intuitive file upload functionality
 - **Intelligent Attendance Processing**:
@@ -10,7 +19,7 @@ A modern Python desktop application for processing Excel files containing attend
   - Recognizes employee data structure with proper validation
   - Extracts complete employee information (ID, Name, Attendance Type, Days)
   - Validates attendance sheet format and shows helpful error messages
-- **Payroll Sheet Processing**: Basic Excel file analysis and data extraction
+- **Payroll Sheet Processing**: Comprehensive payroll data extraction with salary components
 - **Data Export**: Export processed data to JSON format for further use
 - **Excel File Support**: Supports both .xlsx and .xls file formats
 - **Real-time Results Display**: View processing results with detailed information
@@ -19,17 +28,21 @@ A modern Python desktop application for processing Excel files containing attend
 ## Project Structure
 
 ```
-excel_processor/
-├── main.py                 # Main application file
+telly-handel-import/
+├── main.py                      # Main application file
 ├── src/
 │   ├── __init__.py
-│   └── excel_processor.py  # Excel processing logic
-├── assets/                 # (Reserved for future icons/images)
-├── requirements.txt        # Python dependencies
-├── build.spec             # PyInstaller configuration
-├── build.bat              # Build script for creating exe
-├── run.bat                # Script to run the application
-└── README.md              # This file
+│   ├── excel_processor.py       # Excel processing logic
+│   └── tally_api_service.py     # Tally ERP API integration
+├── test_tally_api.py           # API testing script
+├── test_complete_flow.py       # Complete integration testing
+├── mock_tally_api_service.py   # Mock service for testing
+├── requirements.txt            # Python dependencies
+├── build.spec                  # PyInstaller configuration
+├── build.bat                   # Build script for creating exe
+├── run.bat                     # Script to run the application
+├── TALLY_INTEGRATION.md        # Detailed Tally integration docs
+└── README.md                   # This file
 ```
 
 ## Installation & Setup
@@ -78,32 +91,55 @@ excel_processor/
    - The .exe file will be created in the `dist/` folder
    - Double-click `ExcelProcessor.exe` to run
 
+## Prerequisites
+
+### Tally ERP Setup
+
+- Tally ERP should be running and accessible at `http://localhost:9000/`
+- Ensure Tally is configured to accept HTTP requests
+- Test connectivity using: `python test_tally_api.py`
+
 ## How to Use
+
+### New Workflow (with Tally Integration)
 
 1. **Launch the Application**:
 
    - Run from source: `python main.py` or double-click `run.bat`
    - Or run the compiled executable: `ExcelProcessor.exe`
 
-2. **Upload Files**:
+2. **Company Selection** (New Step):
+
+   - Application opens with **Company Selection Screen**
+   - Companies are automatically loaded from Tally ERP
+   - Select your company from the dropdown
+   - Click "Proceed" to continue
+
+3. **Main Processing Screen**:
+
+   - Selected company is displayed at the top in green header
+   - Use "Change Company" button to select a different company
+   - All existing Excel processing features remain the same
+
+4. **Upload Files**:
 
    - Click "Browse File" button under either "Attendance Sheet" or "Payroll Sheet"
    - Select your Excel file (.xlsx or .xls)
    - The selected file path will be displayed
 
-3. **Process Files**:
+5. **Process Files**:
 
    - Click "Process Attendance Sheet" or "Process Payroll Sheet" button
    - View the results in the results area below
 
-4. **View Results**:
+6. **View Results**:
 
    - File information (name, rows, columns)
    - Column names and data types
    - Sample data preview
    - Any error messages if processing fails
 
-5. **Clear Results**:
+7. **Clear Results**:
    - Click "Clear Results" button to clear the results area
 
 ## What the Application Currently Does
@@ -112,7 +148,7 @@ excel_processor/
 
 - **Header Information Extraction**:
   - Date (from row 1, column B)
-  - Company Name (from row 2, column B) 
+  - Company Name (from row 2, column B)
   - Narration (from row 3, column B)
 - **Employee Data Processing**:
   - Automatically finds where employee data starts
@@ -136,7 +172,7 @@ excel_processor/
 
 ```
 Row 1: [blank] | Date (e.g., 09-10-2025) | [blank] | [blank]
-Row 2: [blank] | Company Name (e.g., LIGHT) | [blank] | [blank]  
+Row 2: [blank] | Company Name (e.g., LIGHT) | [blank] | [blank]
 Row 3: [blank] | Narration (e.g., Test attendance) | [blank] | [blank]
 Row 4: [blank row]
 Row 5: EMPL NO | EMPLOYEE NAME | Attendance/Production Types | Attendance Days

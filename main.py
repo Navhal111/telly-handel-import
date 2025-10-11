@@ -11,6 +11,7 @@ import platform
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.excel_processor import ExcelProcessor
+from src.tally_api_service import TallyApiService
 
 
 class ModernExcelProcessor:
@@ -23,11 +24,13 @@ class ModernExcelProcessor:
         # Configure style
         self.setup_style()
         
-        # Initialize Excel processor
+        # Initialize Excel processor and API service
         self.processor = ExcelProcessor()
+        self.api_service = TallyApiService()
+        self.selected_company = None
         
-        # Create GUI
-        self.create_gui()
+        # Show company selection screen first
+        self.show_company_selection_screen()
         
         # Center the window
         self.center_window()
@@ -99,6 +102,20 @@ class ModernExcelProcessor:
                        background=self.colors['light'],
                        foreground=self.colors['dark'],
                        font=('Arial', 10))
+        
+        # Configure combobox styles
+        style.configure('TCombobox',
+                       fieldbackground=self.colors['white'],
+                       background=self.colors['light'],
+                       foreground=self.colors['dark'],
+                       font=('Arial', 12),
+                       borderwidth=2,
+                       relief='solid')
+        
+        style.map('TCombobox',
+                 fieldbackground=[('readonly', self.colors['white']),
+                                ('focus', self.colors['light'])],
+                 bordercolor=[('focus', self.colors['secondary'])])
     
     def center_window(self):
         """Center the window on the screen."""
@@ -108,6 +125,216 @@ class ModernExcelProcessor:
         pos_x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         pos_y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
+    
+    def show_company_selection_screen(self):
+        """Show company selection screen at startup."""
+        # Clear any existing widgets
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Create main container with centered content
+        main_container = tk.Frame(self.root, bg=self.colors['light'])
+        main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Center frame
+        center_frame = tk.Frame(main_container, bg=self.colors['light'])
+        center_frame.pack(expand=True)
+        
+        # Company selection card
+        self.company_frame = tk.Frame(center_frame, bg=self.colors['white'], relief=tk.RAISED, bd=2)
+        self.company_frame.pack(padx=50, pady=80, ipadx=40, ipady=40)
+        
+        # Header section
+        header_frame = tk.Frame(self.company_frame, bg=self.colors['white'])
+        header_frame.pack(fill=tk.X, pady=(0, 30))
+        
+        # Title with better spacing
+        title_label = tk.Label(
+            header_frame, 
+            text="🏢 Company Selection", 
+            font=('Arial', 24, 'bold'),
+            bg=self.colors['white'],
+            fg=self.colors['primary']
+        )
+        title_label.pack(pady=(0, 10))
+        
+        # Subtitle
+        subtitle_label = tk.Label(
+            header_frame, 
+            text="Please select a company from Tally to proceed", 
+            font=('Arial', 14),
+            bg=self.colors['white'],
+            fg=self.colors['dark']
+        )
+        subtitle_label.pack()
+        
+        # Separator line
+        separator = tk.Frame(self.company_frame, height=2, bg=self.colors['light'])
+        separator.pack(fill=tk.X, pady=(20, 30))
+        
+        # Company selection section
+        selection_frame = tk.Frame(self.company_frame, bg=self.colors['white'])
+        selection_frame.pack(fill=tk.X, pady=(0, 30))
+        
+        # Company dropdown label
+        dropdown_label = tk.Label(
+            selection_frame, 
+            text="📋 Select Company:", 
+            font=('Arial', 14, 'bold'),
+            bg=self.colors['white'],
+            fg=self.colors['primary']
+        )
+        dropdown_label.pack(pady=(0, 15))
+        
+        # Dropdown container for better styling
+        dropdown_container = tk.Frame(selection_frame, bg=self.colors['light'], relief=tk.SUNKEN, bd=1)
+        dropdown_container.pack(pady=(0, 25), padx=20, fill=tk.X)
+        
+        # Company dropdown with better styling
+        self.company_var = tk.StringVar(value="Loading companies...")
+        self.company_dropdown = ttk.Combobox(
+            dropdown_container,
+            textvariable=self.company_var,
+            state="readonly",
+            font=('Arial', 14),
+            width=35,
+            height=10
+        )
+        self.company_dropdown.pack(pady=8, padx=8, fill=tk.X)
+        
+        # Buttons frame with centered layout
+        button_frame = tk.Frame(selection_frame, bg=self.colors['white'])
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        # Button container for centering
+        btn_container = tk.Frame(button_frame, bg=self.colors['white'])
+        btn_container.pack()
+        
+        # Refresh button with better styling
+        self.refresh_btn = ttk.Button(
+            btn_container,
+            text="🔄 Refresh Companies",
+            command=self.load_companies,
+            style='Secondary.TButton'
+        )
+        self.refresh_btn.pack(side=tk.LEFT, padx=(0, 30))
+        
+        # Proceed button with better styling
+        self.proceed_btn = ttk.Button(
+            btn_container,
+            text="➡️ Proceed to Application",
+            command=self.proceed_to_main,
+            style='Success.TButton',
+            state='disabled'
+        )
+        self.proceed_btn.pack(side=tk.LEFT)
+        
+        # Status section
+        status_frame = tk.Frame(self.company_frame, bg=self.colors['white'])
+        status_frame.pack(fill=tk.X, pady=(30, 0))
+        
+        # Status with icon
+        self.company_status_label = tk.Label(
+            status_frame,
+            text="🔄 Loading companies from Tally...",
+            font=('Arial', 12),
+            bg=self.colors['white'],
+            fg=self.colors['secondary']
+        )
+        self.company_status_label.pack()
+        
+        # Load companies automatically
+        self.load_companies()
+        
+        # Bind selection change
+        self.company_dropdown.bind('<<ComboboxSelected>>', self.on_company_selected)
+    
+    def load_companies(self):
+        """Load companies from Tally API."""
+        # Disable buttons during loading
+        self.refresh_btn.configure(state='disabled', text='Loading...')
+        self.proceed_btn.configure(state='disabled')
+        self.company_status_label.configure(text="🔄 Connecting to Tally...", fg=self.colors['secondary'])
+        self.company_var.set("Loading companies...")
+        self.root.update()
+        
+        # Load companies in background thread
+        thread = threading.Thread(target=self._load_companies_background)
+        thread.daemon = True
+        thread.start()
+    
+    def _load_companies_background(self):
+        """Load companies in background thread."""
+        try:
+            result = self.api_service.get_companies()
+            # Update UI in main thread
+            self.root.after(0, self._handle_companies_result, result)
+        except Exception as e:
+            error_result = {"success": False, "error": str(e), "companies": []}
+            self.root.after(0, self._handle_companies_result, error_result)
+    
+    def _handle_companies_result(self, result):
+        """Handle companies loading result."""
+        # Restore refresh button
+        self.refresh_btn.configure(state='normal', text='🔄 Refresh Companies')
+        
+        if result.get("success", False):
+            companies = result.get("companies", [])
+            if companies:
+                # Populate dropdown
+                self.company_dropdown['values'] = companies
+                self.company_var.set("-- Please Select a Company --")
+                self.company_status_label.configure(
+                    text=f"✅ Successfully loaded {len(companies)} companies from Tally",
+                    fg=self.colors['success']
+                )
+            else:
+                self.company_var.set("No companies available")
+                self.company_status_label.configure(
+                    text="⚠️ No companies found in your Tally database",
+                    fg=self.colors['warning']
+                )
+        else:
+            error_msg = result.get("error", "Unknown error")
+            self.company_var.set("Connection failed - Click Refresh")
+            self.company_status_label.configure(
+                text=f"❌ Connection Error: {error_msg}",
+                fg=self.colors['danger']
+            )
+    
+    def on_company_selected(self, event=None):
+        """Handle company selection."""
+        selected = self.company_var.get()
+        invalid_selections = [
+            "Loading companies...", 
+            "-- Please Select a Company --", 
+            "No companies available", 
+            "Connection failed - Click Refresh"
+        ]
+        
+        if selected and selected not in invalid_selections:
+            self.selected_company = selected
+            self.proceed_btn.configure(state='normal')
+            # Update status to show selection
+            self.company_status_label.configure(
+                text=f"🏢 Selected: {selected} - Ready to proceed",
+                fg=self.colors['primary']
+            )
+        else:
+            self.selected_company = None
+            self.proceed_btn.configure(state='disabled')
+    
+    def proceed_to_main(self):
+        """Proceed to main application with selected company."""
+        if self.selected_company:
+            # Clear company selection screen
+            for widget in self.root.winfo_children():
+                widget.destroy()
+            
+            # Create main GUI
+            self.create_gui()
+        else:
+            messagebox.showwarning("No Company Selected", "Please select a company to proceed.")
     
     def create_gui(self):
         """Create the main GUI interface."""
@@ -120,16 +347,46 @@ class ModernExcelProcessor:
         header_frame = tk.Frame(main_frame, bg=self.colors['light'])
         header_frame.pack(fill=tk.X, pady=(0, 20))
         
+        # Company info section at top
+        if self.selected_company:
+            company_info_frame = tk.Frame(header_frame, bg=self.colors['success'], relief=tk.SOLID, bd=1)
+            company_info_frame.pack(fill=tk.X, pady=(0, 15), ipady=10)
+            
+            # Left side - Company info
+            company_left = tk.Frame(company_info_frame, bg=self.colors['success'])
+            company_left.pack(side=tk.LEFT, padx=15, pady=5)
+            
+            company_label = tk.Label(
+                company_left,
+                text=f"🏢 Selected Company: {self.selected_company}",
+                font=('Arial', 14, 'bold'),
+                bg=self.colors['success'],
+                fg=self.colors['white']
+            )
+            company_label.pack(anchor=tk.W)
+            
+            # Right side - Change company button
+            company_right = tk.Frame(company_info_frame, bg=self.colors['success'])
+            company_right.pack(side=tk.RIGHT, padx=15, pady=5)
+            
+            change_company_btn = ttk.Button(
+                company_right,
+                text="🔄 Change Company",
+                command=self.show_company_selection_screen,
+                style='Secondary.TButton'
+            )
+            change_company_btn.pack(anchor=tk.E)
+        
         # Title with icon - bigger and more prominent
-        title_label = ttk.Label(header_frame, text="� Excel File Processor", style='Title.TLabel')
+        title_label = ttk.Label(header_frame, text="📊 Excel File Processor", style='Title.TLabel')
         title_label.pack(pady=(0, 5))
         
         subtitle_label = ttk.Label(header_frame, text="Upload and process Attendance or Payroll Excel files with intelligent data extraction", style='Subtitle.TLabel')
         subtitle_label.pack(pady=(0, 3))
         
-        # Description line
-        desc_label = ttk.Label(header_frame, text="Supports header extraction, employee data processing, and JSON export", style='Info.TLabel')
-        desc_label.pack()
+        # # Description line
+        # desc_label = ttk.Label(header_frame, text="Supports header extraction, employee data processing, and JSON export", style='Info.TLabel')
+        # desc_label.pack()
         
         # Upload sections container with reduced spacing
         upload_frame = tk.Frame(main_frame, bg=self.colors['light'])
@@ -369,12 +626,89 @@ class ModernExcelProcessor:
             
             messagebox.showerror("Invalid Excel File", detailed_msg)
     
+    def _upload_attendance_to_tally(self, attendance_result):
+        """Upload attendance data to Tally."""
+        # Update status
+        self.status_text.configure(text="🔄 Uploading attendance data to Tally...")
+        self.root.update()
+        
+        # Upload in background thread
+        thread = threading.Thread(target=self._upload_attendance_background, args=(attendance_result,))
+        thread.daemon = True
+        thread.start()
+    
+    def _upload_attendance_background(self, attendance_result):
+        """Upload attendance data in background thread."""
+        try:
+            # Use selected company name
+            company_name = self.selected_company
+            
+            # Call upload API
+            upload_result = self.api_service.upload_attendance_data(attendance_result, company_name)
+            
+            # Update UI in main thread
+            self.root.after(0, self._handle_upload_result, upload_result)
+            
+        except Exception as e:
+            error_result = {"success": False, "error": str(e)}
+            self.root.after(0, self._handle_upload_result, error_result)
+    
+    def _handle_upload_result(self, upload_result):
+        """Handle the upload result."""
+        # Log the complete response for debugging
+        print("="*60)
+        print("🔍 TALLY API RESPONSE:")
+        print("="*60)
+        print(f"Success: {upload_result.get('success', False)}")
+        print(f"Message: {upload_result.get('message', 'No message')}")
+        print(f"Error: {upload_result.get('error', 'No error')}")
+        
+        # Log the actual response from Tally
+        response_text = upload_result.get("response", "No response")
+        if response_text:
+            print("📄 Raw Tally Response:")
+            print("-" * 40)
+            print(response_text)
+            print("-" * 40)
+        print("="*60)
+        
+        if upload_result.get("success", False):
+            # Success - no errors in Tally response
+            created_count = upload_result.get("created_count", 0)
+            self.status_text.configure(text="✅ Attendance data successfully uploaded to Tally!")
+            
+            messagebox.showinfo(
+                "Upload Successful", 
+                f"✅ Success!\n\nAttendance data has been successfully uploaded to {self.selected_company} in Tally!\n\n📊 Records Created: {created_count}\n\nReturning to main screen..."
+            )
+            
+            # Clear file selections and return to main Excel processor screen
+            self.attendance_file_path.set("No file selected")
+            if hasattr(self, 'payroll_file_path'):
+                self.payroll_file_path.set("No file selected")
+            
+            # Return to main Excel processor screen
+            self.show_main_screen()
+            
+        else:
+            # Error - Tally reported errors
+            error_msg = upload_result.get("error", "Unknown error")
+            errors_count = upload_result.get("errors_count", 0)
+            error_message = upload_result.get("error_message", "")
+            
+            self.status_text.configure(text="❌ Failed to upload attendance data to Tally")
+            
+            # Create detailed error message
+            if error_message:
+                full_error_msg = f"❌ Upload Failed!\n\nTally Error: {error_message}\n\nThis usually means there's a data mismatch. Please check your Excel file and ensure:\n• Employee names exist in Tally\n• Attendance types are valid\n• Data format is correct"
+            else:
+                full_error_msg = f"❌ Upload Failed!\n\n{error_msg}\n\nErrors Found: {errors_count}\n\nPlease check your Excel data and try again."
+            
+            messagebox.showerror("Upload Failed", full_error_msg)
+    
     def add_result(self, text):
-        """Add text to the results area."""
-        self.results_text.insert(tk.END, f"{text}\n")
-        self.results_text.see(tk.END)
-        # Force UI update
-        self.root.update_idletasks()
+        """Update status text (replacing old results functionality)."""
+        self.status_text.configure(text=text)
     
     def show_loading(self, section_type, file_name):
         """Show loading indicator in results."""
@@ -477,18 +811,6 @@ class ModernExcelProcessor:
                 self.results_text.insert(tk.END, f"   • Row 2: Company Name in column B (e.g., LIGHT)\n")
                 self.results_text.insert(tk.END, f"   • Row 3: Narration in column B (e.g., Test attendance)\n")
                 self.results_text.insert(tk.END, f"   • Row 5+: Employee data with headers:\n")
-                self.results_text.insert(tk.END, f"     - EMPL NO\n")
-                self.results_text.insert(tk.END, f"     - EMPLOYEE NAME\n")
-                self.results_text.insert(tk.END, f"     - Attendance/Production Types\n")
-                self.results_text.insert(tk.END, f"     - Attendance Days\n")
-        
-        self.results_text.insert(tk.END, "\n" + "="*80 + "\n\n")
-        self.results_text.see(tk.END)
-        self.results_text.update()  # Force display update
-
-    def add_result(self, text):
-        """Update status text (replacing old results functionality)."""
-        self.status_text.configure(text=text)
     
     def download_sample(self, section_type):
         """Download and open a sample Excel file for the specified section type."""
@@ -731,14 +1053,22 @@ For Payroll Sheet:
         )
         back_btn.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Export button
-        export_btn = ttk.Button(
-            left_btn_frame,
-            text="Export to JSON",
-            command=lambda: self.export_data_from_screen(section_type, result),
-            style='Success.TButton'
-        )
-        export_btn.pack(side=tk.LEFT)
+        # Export/Upload button - conditional based on section type
+        if section_type == "attendance":
+            action_btn = ttk.Button(
+                left_btn_frame,
+                text="📤 Upload to Tally",
+                command=lambda: self._upload_attendance_to_tally(result),
+                style='Success.TButton'
+            )
+        else:
+            action_btn = ttk.Button(
+                left_btn_frame,
+                text="Export to JSON",
+                command=lambda: self.export_data_from_screen(section_type, result),
+                style='Success.TButton'
+            )
+        action_btn.pack(side=tk.LEFT)
         
         # Right side buttons
         right_btn_frame = tk.Frame(btn_frame, bg=self.colors['light'])
