@@ -20,6 +20,175 @@ class TallyApiService:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
+    def get_server_info(self) -> Dict[str, any]:
+        """
+        Get basic information about the Tally instance.
+        
+        Returns:
+            Dict containing Tally server information
+        """
+        # This could be expanded to get Tally version, license info, etc.
+        # For now, just return connection status
+        return self.test_connection()
+    
+    def upload_payroll_data(self, payroll_result: Dict[str, any], company_name: str, account_name: str = "Cash") -> Dict[str, any]:
+        """
+        Upload payroll data to Tally.
+        
+        Args:
+            payroll_result: Processed payroll data from Excel processor
+            company_name: Selected company name
+            account_name: Account name to use (PARTYLEDGERNAME), defaults to "Cash"
+            
+        Returns:
+            Dict containing success status and upload results
+        """
+        try:
+            self.logger.info("Starting payroll data upload to Tally...")
+            
+            # Generate XML for payroll voucher
+            xml_request = self._generate_payroll_xml(payroll_result, company_name, account_name)
+            
+            self.logger.info("Generated payroll XML for Tally upload")
+            self.logger.debug(f"Payroll XML content: {xml_request[:1000]}...")
+            
+            # Make POST request to Tally
+            response = self.session.post(
+                self.base_url,
+                data=xml_request,
+                timeout=30
+            )
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                self.logger.info("✅ Successfully sent payroll request to Tally")
+                
+                # Parse Tally response to check for errors
+                tally_result = self._parse_tally_response(response.text)
+                return tally_result
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.reason}"
+                self.logger.error(f"❌ Payroll upload failed: {error_msg}")
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "response": response.text if response.text else None,
+                    "errors_count": 0,
+                    "created_count": 0
+                }
+                
+        except Exception as e:
+            error_msg = f"Payroll upload error: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg
+            }
+    
+    def _generate_payroll_xml(self, payroll_result: Dict[str, any], company_name: str, account_name: str = "Cash") -> str:
+        """
+        Generate XML envelope for payroll data upload.
+        
+        Args:
+            payroll_result: Processed payroll data
+            company_name: Selected company name
+            account_name: Account name to use as PARTYLEDGERNAME
+            
+        Returns:
+            XML string formatted for Tally import
+        """
+        try:
+            # Extract data from payroll result
+            date = payroll_result.get('date', '20250401')  # Default date if not found
+            narration = payroll_result.get('narration', 'Payroll Import')
+            employee_data = payroll_result.get('employee_data', [])
+            
+            # Convert date format if needed (from DD-MM-YYYY to YYYYMMDD)
+            formatted_date = self._format_date_for_tally(date)
+            
+            # Start building XML
+            xml_lines = [
+                '<ENVELOPE>',
+                ' <HEADER>',
+                '  <TALLYREQUEST>Import Data</TALLYREQUEST>',
+                ' </HEADER>',
+                ' <BODY>',
+                '  <IMPORTDATA>',
+                '   <REQUESTDESC>',
+                '    <REPORTNAME>Vouchers</REPORTNAME>',
+                '    <STATICVARIABLES>',
+                f'     <SVCURRENTCOMPANY>{company_name}</SVCURRENTCOMPANY>',
+                '    </STATICVARIABLES>',
+                '   </REQUESTDESC>',
+                '   <REQUESTDATA>',
+                '    <TALLYMESSAGE xmlns:UDF="TallyUDF">',
+                '     <VOUCHER VCHTYPE="Payroll" ACTION="Create" OBJVIEW="PaySlip Voucher View">',
+                f'      <DATE>{formatted_date}</DATE>',
+                f'      <NARRATION>{narration}</NARRATION>',
+                f'      <PARTYLEDGERNAME>{account_name}</PARTYLEDGERNAME>',
+                '      <VOUCHERTYPENAME>Payroll</VOUCHERTYPENAME>',
+                '      <CATEGORYENTRY.LIST>',
+                '       <CATEGORY>Primary Cost Category</CATEGORY>'
+            ]
+            
+            # Add employee entries
+            employee_sort_order = 1
+            for employee in employee_data:
+                emp_name = employee.get('employee_name', '').strip()
+                salary_components = employee.get('salary_components', {})
+                total_gross = employee.get('total_gross_salary', 0)
+                
+                if emp_name and salary_components:  # Only add if we have name and salary data
+                    xml_lines.extend([
+                        '       <EMPLOYEEENTRIES.LIST>',
+                        f'        <EMPLOYEENAME>{emp_name}</EMPLOYEENAME>',
+                        f'        <EMPLOYEESORTORDER> {employee_sort_order}</EMPLOYEESORTORDER>',
+                        f'        <AMOUNT>-{total_gross:.2f}</AMOUNT>'
+                    ])
+                    
+                    # Add payhead allocations for each salary component
+                    payhead_sort_order = 1
+                    for payhead_name, amount in salary_components.items():
+                        if amount != 0:  # Only include non-zero amounts
+                            xml_lines.extend([
+                                '        <PAYHEADALLOCATIONS.LIST>',
+                                f'         <PAYHEADNAME>{payhead_name}</PAYHEADNAME>',
+                                '         <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+                                f'         <PAYHEADSORTORDER> {payhead_sort_order}</PAYHEADSORTORDER>',
+                                f'         <AMOUNT>-{amount:.2f}</AMOUNT>',
+                                '        </PAYHEADALLOCATIONS.LIST>'
+                            ])
+                            payhead_sort_order += 1
+                    
+                    xml_lines.append('       </EMPLOYEEENTRIES.LIST>')
+                    employee_sort_order += 1
+            
+            # Close XML structure
+            xml_lines.extend([
+                '      </CATEGORYENTRY.LIST>',
+                '     </VOUCHER>',
+                '    </TALLYMESSAGE>',
+                '   </REQUESTDATA>',
+                '  </IMPORTDATA>',
+                ' </BODY>',
+                '</ENVELOPE>'
+            ])
+            
+            xml_content = '\n'.join(xml_lines)
+            self.logger.debug(f"Generated payroll XML with {len(employee_data)} employees")
+            return xml_content
+            
+        except Exception as e:
+            self.logger.error(f"Error generating payroll XML: {str(e)}")
+            raiseession.headers.update({
+            'Content-Type': 'application/xml',
+            'Accept': 'application/xml'
+        })
+        
+        # Setup logging
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+    
     def get_companies(self) -> Dict[str, any]:
         """
         Fetch list of companies from Tally.

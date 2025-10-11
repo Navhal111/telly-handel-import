@@ -355,26 +355,30 @@ class ExcelProcessor:
         return validation_result
     
     def extract_payroll_employee_data(self, df: pd.DataFrame, employee_start_row: int) -> List[Dict[str, Any]]:
-        """Extract payroll employee data from the DataFrame."""
+        """Extract payroll employee data from the DataFrame - FULLY DYNAMIC."""
         employee_data = []
         
         try:
             # Get header row
             header_row = df.iloc[employee_start_row]
             
-            # Create column mapping based on actual headers
-            column_mapping = {}
-            salary_columns = []
+            # Create COMPLETELY DYNAMIC column mapping - capture ALL non-empty headers
+            all_columns = []
+            column_headers = []
             
             for idx, header in enumerate(header_row):
                 if not pd.isna(header):
-                    header_clean = str(header).strip().upper()
-                    if 'EMPL' in header_clean and 'NO' in header_clean:
-                        column_mapping['employee_no'] = idx
-                    elif 'EMPLOYEE' in header_clean and 'NAME' in header_clean:
-                        column_mapping['employee_name'] = idx
-                    elif any(sal_type in header_clean for sal_type in ['BASIC', 'HRA', 'MEDICAL', 'RESPONSIBILITY', 'FUEL', 'ZSSF', 'ZHSF', 'PAYE']):
-                        salary_columns.append((idx, str(header).strip()))
+                    header_name = str(header).strip()
+                    if header_name:  # Only add if header is not empty
+                        all_columns.append((idx, header_name))
+                        column_headers.append(header_name)
+            
+            print(f"🎯 DYNAMIC DEBUG: Found {len(all_columns)} columns: {column_headers}")
+            
+            # If we have no columns at all, this might not be a valid header row
+            if not all_columns:
+                print("⚠️ WARNING: No valid column headers found")
+                return employee_data
             
             # Extract data rows
             data_rows = df.iloc[employee_start_row + 1:]
@@ -385,37 +389,54 @@ class ExcelProcessor:
                     continue
                 
                 employee_record = {}
-                
-                # Extract basic employee info
-                if 'employee_no' in column_mapping:
-                    emp_no = row.iloc[column_mapping['employee_no']]
-                    employee_record['employee_no'] = str(emp_no) if not pd.isna(emp_no) else ''
-                
-                if 'employee_name' in column_mapping:
-                    emp_name = row.iloc[column_mapping['employee_name']]
-                    employee_record['employee_name'] = str(emp_name) if not pd.isna(emp_name) else ''
-                
-                # Extract salary components
-                salary_data = {}
+                all_data = {}
                 total_salary = 0
                 
-                for col_idx, col_name in salary_columns:
+                # Extract ALL column data dynamically
+                for col_idx, col_name in all_columns:
                     try:
-                        sal_value = row.iloc[col_idx]
-                        if not pd.isna(sal_value):
-                            # Convert to float for calculation
-                            sal_float = float(str(sal_value).replace(',', '')) if sal_value != '' else 0
-                            salary_data[col_name] = sal_float
-                            
-                            # Add to total if it's not a deduction
-                            if not any(deduction in col_name.upper() for deduction in ['ZSSF', 'ZHSF', 'PAYE']):
-                                total_salary += sal_float
+                        cell_value = row.iloc[col_idx]
+                        
+                        if not pd.isna(cell_value):
+                            # Try to convert to number if possible, otherwise keep as string
+                            try:
+                                numeric_value = float(str(cell_value).replace(',', ''))
+                                all_data[col_name] = numeric_value
+                                
+                                # Add to total if it's a numeric value and not the first two columns 
+                                # (assuming first two are usually ID and Name type columns)
+                                if col_idx >= 2:  # Skip first two columns from total calculation
+                                    total_salary += numeric_value
+                            except (ValueError, TypeError):
+                                # Keep as string if not numeric
+                                all_data[col_name] = str(cell_value).strip()
                         else:
-                            salary_data[col_name] = 0
-                    except (ValueError, TypeError):
-                        salary_data[col_name] = 0
+                            all_data[col_name] = 0 if col_idx >= 2 else ''  # Numeric 0 for data columns, empty string for text columns
+                    except Exception as e:
+                        print(f"⚠️ Warning processing column {col_name}: {str(e)}")
+                        all_data[col_name] = 0 if col_idx >= 2 else ''
                 
-                employee_record['salary_components'] = salary_data
+                # Set dynamic fields
+                if all_columns:
+                    # Use first column as employee_no and second as employee_name (if they exist)
+                    if len(all_columns) >= 1:
+                        first_col_name = all_columns[0][1]
+                        employee_record['employee_no'] = str(all_data.get(first_col_name, ''))
+                    
+                    if len(all_columns) >= 2:
+                        second_col_name = all_columns[1][1]
+                        employee_record['employee_name'] = str(all_data.get(second_col_name, ''))
+                    
+                    # All columns after the first two become salary components
+                    salary_components = {}
+                    if len(all_columns) > 2:
+                        for col_idx, col_name in all_columns[2:]:  # Skip first two columns
+                            salary_components[col_name] = all_data.get(col_name, 0)
+                    
+                    employee_record['salary_components'] = salary_components
+                    employee_record['all_data'] = all_data  # Keep all data for reference
+                    employee_record['column_headers'] = column_headers  # Store headers for UI
+                
                 employee_record['total_gross_salary'] = total_salary
                 
                 # Only add record if it has at least employee name or number

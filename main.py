@@ -14,6 +14,87 @@ from src.excel_processor import ExcelProcessor
 from src.tally_api_service import TallyApiService
 
 
+class AccountSelectionDialog:
+    """Dialog for selecting account name for payroll upload."""
+    
+    def __init__(self, parent):
+        self.result = None
+        
+        # Create dialog window
+        self.top = tk.Toplevel(parent)
+        self.top.title("Select Account")
+        self.top.geometry("400x200")
+        self.top.resizable(False, False)
+        
+        # Center the dialog
+        self.top.transient(parent)
+        self.top.grab_set()
+        
+        # Create frame
+        frame = ttk.Frame(self.top, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title_label = ttk.Label(frame, text="Select Account for Payroll", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # Description
+        desc_label = ttk.Label(frame, text="Enter the account name (PARTYLEDGERNAME) to be used for this payroll voucher:", wraplength=350)
+        desc_label.pack(pady=(0, 10))
+        
+        # Account entry
+        self.account_var = tk.StringVar(value="Cash")  # Default to "Cash"
+        ttk.Label(frame, text="Account Name:").pack(anchor='w')
+        self.account_entry = ttk.Entry(frame, textvariable=self.account_var, width=40)
+        self.account_entry.pack(fill=tk.X, pady=(5, 15))
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X)
+        
+        ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(button_frame, text="OK", command=self.ok).pack(side=tk.RIGHT)
+        
+        # Focus and bind enter
+        self.account_entry.focus()
+        self.account_entry.bind('<Return>', lambda e: self.ok())
+        self.top.bind('<Escape>', lambda e: self.cancel())
+        
+        # Center the dialog on parent
+        self.center_on_parent(parent)
+    
+    def center_on_parent(self, parent):
+        """Center dialog on parent window."""
+        self.top.update_idletasks()
+        
+        parent_x = parent.winfo_rootx()
+        parent_y = parent.winfo_rooty()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+        
+        dialog_width = self.top.winfo_width()
+        dialog_height = self.top.winfo_height()
+        
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
+        self.top.geometry(f"+{x}+{y}")
+    
+    def ok(self):
+        """Handle OK button."""
+        account_name = self.account_var.get().strip()
+        if account_name:
+            self.result = account_name
+            self.top.destroy()
+        else:
+            messagebox.showerror("Error", "Please enter an account name.")
+    
+    def cancel(self):
+        """Handle Cancel button."""
+        self.result = None
+        self.top.destroy()
+
+
 class ModernExcelProcessor:
     def __init__(self):
         self.root = tk.Tk()
@@ -706,6 +787,96 @@ class ModernExcelProcessor:
             
             messagebox.showerror("Upload Failed", full_error_msg)
     
+    def _upload_payroll_to_tally(self, payroll_result):
+        """Upload payroll data to Tally."""
+        # First, ask user for account information
+        account_dialog = AccountSelectionDialog(self.root)
+        self.root.wait_window(account_dialog.top)
+        
+        if account_dialog.result:
+            account_name = account_dialog.result
+            
+            # Update status
+            self.status_text.configure(text="🔄 Uploading payroll data to Tally...")
+            self.root.update()
+            
+            # Upload in background thread
+            thread = threading.Thread(target=self._upload_payroll_background, args=(payroll_result, account_name))
+            thread.daemon = True
+            thread.start()
+        else:
+            # User cancelled account selection
+            self.status_text.configure(text="Upload cancelled")
+    
+    def _upload_payroll_background(self, payroll_result, account_name):
+        """Upload payroll data in background thread."""
+        try:
+            # Use selected company name
+            company_name = self.selected_company
+            
+            # Call upload API
+            upload_result = self.api_service.upload_payroll_data(payroll_result, company_name, account_name)
+            
+            # Update UI in main thread
+            self.root.after(0, self._handle_payroll_upload_result, upload_result)
+            
+        except Exception as e:
+            error_result = {"success": False, "error": str(e)}
+            self.root.after(0, self._handle_payroll_upload_result, error_result)
+    
+    def _handle_payroll_upload_result(self, upload_result):
+        """Handle the payroll upload result."""
+        # Log the complete response for debugging
+        print("="*60)
+        print("🔍 TALLY PAYROLL API RESPONSE:")
+        print("="*60)
+        print(f"Success: {upload_result.get('success', False)}")
+        print(f"Message: {upload_result.get('message', 'No message')}")
+        print(f"Error: {upload_result.get('error', 'No error')}")
+        
+        # Log the actual response from Tally
+        response_text = upload_result.get("response", "No response")
+        if response_text:
+            print("📄 Raw Tally Response:")
+            print("-" * 40)
+            print(response_text)
+            print("-" * 40)
+        print("="*60)
+        
+        if upload_result.get("success", False):
+            # Success - no errors in Tally response
+            created_count = upload_result.get("created_count", 0)
+            self.status_text.configure(text="✅ Payroll data successfully uploaded to Tally!")
+            
+            messagebox.showinfo(
+                "Upload Successful", 
+                f"✅ Success!\n\nPayroll data has been successfully uploaded to {self.selected_company} in Tally!\n\n📊 Records Created: {created_count}\n\nReturning to main screen..."
+            )
+            
+            # Clear file selections and return to main Excel processor screen
+            self.attendance_file_path.set("No file selected")
+            if hasattr(self, 'payroll_file_path'):
+                self.payroll_file_path.set("No file selected")
+            
+            # Return to main Excel processor screen
+            self.show_main_screen()
+            
+        else:
+            # Error - Tally reported errors
+            error_msg = upload_result.get("error", "Unknown error")
+            errors_count = upload_result.get("errors_count", 0)
+            error_message = upload_result.get("error_message", "")
+            
+            self.status_text.configure(text="❌ Failed to upload payroll data to Tally")
+            
+            # Create detailed error message
+            if error_message:
+                full_error_msg = f"❌ Payroll Upload Failed!\n\nTally Error: {error_message}\n\nThis usually means there's a data mismatch. Please check your Excel file and ensure:\n• Employee names exist in Tally\n• Payhead names are valid\n• Data format is correct\n• Account name exists in Tally"
+            else:
+                full_error_msg = f"❌ Payroll Upload Failed!\n\n{error_msg}\n\nErrors Found: {errors_count}\n\nPlease check your Excel data and try again."
+            
+            messagebox.showerror("Upload Failed", full_error_msg)
+    
     def add_result(self, text):
         """Update status text (replacing old results functionality)."""
         self.status_text.configure(text=text)
@@ -1061,6 +1232,13 @@ For Payroll Sheet:
                 command=lambda: self._upload_attendance_to_tally(result),
                 style='Success.TButton'
             )
+        elif section_type == "payroll":
+            action_btn = ttk.Button(
+                left_btn_frame,
+                text="📤 Upload to Tally",
+                command=lambda: self._upload_payroll_to_tally(result),
+                style='Success.TButton'
+            )
         else:
             action_btn = ttk.Button(
                 left_btn_frame,
@@ -1098,42 +1276,46 @@ For Payroll Sheet:
         print(f"🎯 DEBUG: Success: {result.get('success', False)}")
         
         if section_type == "attendance":
-            # File Information Section
-            file_section = tk.LabelFrame(parent_frame, text="📊 File Information", 
+            # Combined File & Header Information Section (Side by Side)
+            info_section = tk.LabelFrame(parent_frame, text="📊 File & Header Information", 
                                        font=('Arial', 11, 'bold'), bg=self.colors['light'],
                                        fg=self.colors['primary'])
-            file_section.pack(fill=tk.X, pady=(0, 10), padx=5)
+            info_section.pack(fill=tk.X, pady=(0, 10), padx=5)
             
-            file_info = tk.Frame(file_section, bg=self.colors['light'])
-            file_info.pack(fill=tk.X, padx=10, pady=8)
+            # Create main container for left and right columns
+            info_container = tk.Frame(info_section, bg=self.colors['light'])
+            info_container.pack(fill=tk.X, padx=10, pady=8)
             
-            tk.Label(file_info, text=f"📁 File: {result.get('file_name', 'N/A')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=2)
-            tk.Label(file_info, text=f"📏 Total Rows: {result.get('total_rows', 0)}", 
-                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=2)
-            tk.Label(file_info, text=f"📐 Total Columns: {result.get('total_columns', 0)}", 
-                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=2)
+            # Left column - File Information
+            left_frame = tk.Frame(info_container, bg=self.colors['light'])
+            left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
             
-            # Header Information Section
-            header_section = tk.LabelFrame(parent_frame, text="📋 Header Information", 
-                                         font=('Arial', 11, 'bold'), bg=self.colors['light'],
-                                         fg=self.colors['primary'])
-            header_section.pack(fill=tk.X, pady=(0, 10), padx=5)
+            tk.Label(left_frame, text="📊 File Information", 
+                    font=('Arial', 10, 'bold'), bg=self.colors['light'], fg=self.colors['primary']).pack(anchor=tk.W, pady=(0, 5))
+            tk.Label(left_frame, text=f"� File: {result.get('file_name', 'N/A')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=1)
+            tk.Label(left_frame, text=f"� Total Rows: {result.get('total_rows', 0)}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=1)
+            tk.Label(left_frame, text=f"� Total Columns: {result.get('total_columns', 0)}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=1)
             
-            header_info = tk.Frame(header_section, bg=self.colors['light'])
-            header_info.pack(fill=tk.X, padx=10, pady=8)
+            # Right column - Header Information
+            right_frame = tk.Frame(info_container, bg=self.colors['light'])
+            right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
             
             # Debug print header values
             print(f"🔍 DEBUG: Date: {result.get('date', 'Not found')}")
             print(f"🔍 DEBUG: Company: {result.get('company_name', 'Not found')}")
             print(f"🔍 DEBUG: Narration: {result.get('narration', 'Not found')}")
             
-            tk.Label(header_info, text=f"📅 Date: {result.get('date', 'Not found')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=3)
-            tk.Label(header_info, text=f"🏢 Company Name: {result.get('company_name', 'Not found')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=3)
-            tk.Label(header_info, text=f"📝 Narration: {result.get('narration', 'Not found')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=3)
+            tk.Label(right_frame, text="📋 Header Information", 
+                    font=('Arial', 10, 'bold'), bg=self.colors['light'], fg=self.colors['primary']).pack(anchor=tk.W, pady=(0, 5))
+            tk.Label(right_frame, text=f"📅 Date: {result.get('date', 'Not found')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=1)
+            tk.Label(right_frame, text=f"🏢 Company: {result.get('company_name', 'Not found')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=1)
+            tk.Label(right_frame, text=f"📝 Narration: {result.get('narration', 'Not found')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=1)
             
             # Employee Data Section
             employee_data = result.get('employee_data', [])
@@ -1201,39 +1383,43 @@ For Payroll Sheet:
         else:  # payroll
             print(f"🎯 DEBUG: Processing payroll display")
             
-            # File Information Section
-            file_section = tk.LabelFrame(parent_frame, text="� File Information", 
+            # Combined File & Header Information Section (Side by Side)
+            info_section = tk.LabelFrame(parent_frame, text="📊 File & Header Information", 
                                        font=('Arial', 11, 'bold'), bg=self.colors['light'],
                                        fg=self.colors['primary'])
-            file_section.pack(fill=tk.X, pady=(0, 10), padx=5)
+            info_section.pack(fill=tk.X, pady=(0, 10), padx=5)
             
-            file_info = tk.Frame(file_section, bg=self.colors['light'])
-            file_info.pack(fill=tk.X, padx=10, pady=8)
+            # Create main container for left and right columns
+            info_container = tk.Frame(info_section, bg=self.colors['light'])
+            info_container.pack(fill=tk.X, padx=10, pady=8)
             
-            tk.Label(file_info, text=f"📁 File: {result.get('file_name', 'N/A')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=2)
-            tk.Label(file_info, text=f"📏 Total Rows: {result.get('total_rows', 0)}", 
-                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=2)
-            tk.Label(file_info, text=f"📐 Total Columns: {result.get('total_columns', 0)}", 
-                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=2)
+            # Left column - File Information
+            left_frame = tk.Frame(info_container, bg=self.colors['light'])
+            left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
             
-            # Header Information Section
-            header_section = tk.LabelFrame(parent_frame, text="📋 Header Information", 
-                                         font=('Arial', 11, 'bold'), bg=self.colors['light'],
-                                         fg=self.colors['primary'])
-            header_section.pack(fill=tk.X, pady=(0, 10), padx=5)
+            tk.Label(left_frame, text="📊 File Information", 
+                    font=('Arial', 10, 'bold'), bg=self.colors['light'], fg=self.colors['primary']).pack(anchor=tk.W, pady=(0, 5))
+            tk.Label(left_frame, text=f"� File: {result.get('file_name', 'N/A')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=1)
+            tk.Label(left_frame, text=f"� Total Rows: {result.get('total_rows', 0)}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=1)
+            tk.Label(left_frame, text=f"� Total Columns: {result.get('total_columns', 0)}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['dark']).pack(anchor=tk.W, pady=1)
             
-            header_info = tk.Frame(header_section, bg=self.colors['light'])
-            header_info.pack(fill=tk.X, padx=10, pady=8)
+            # Right column - Header Information
+            right_frame = tk.Frame(info_container, bg=self.colors['light'])
+            right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
             
             print(f"🎯 DEBUG: Payroll Header - Date: {result.get('date')}, Company: {result.get('company_name')}")
             
-            tk.Label(header_info, text=f"� Date: {result.get('date', 'Not found')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=3)
-            tk.Label(header_info, text=f"🏢 Company Name: {result.get('company_name', 'Not found')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=3)
-            tk.Label(header_info, text=f"🏦 Account: {result.get('account', 'Not found')}", 
-                    font=('Arial', 11, 'bold'), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=3)
+            tk.Label(right_frame, text="📋 Header Information", 
+                    font=('Arial', 10, 'bold'), bg=self.colors['light'], fg=self.colors['primary']).pack(anchor=tk.W, pady=(0, 5))
+            tk.Label(right_frame, text=f"📅 Date: {result.get('date', 'Not found')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=1)
+            tk.Label(right_frame, text=f"🏢 Company: {result.get('company_name', 'Not found')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=1)
+            tk.Label(right_frame, text=f"🏦 Account: {result.get('account', 'Not found')}", 
+                    font=('Arial', 10), bg=self.colors['light'], fg=self.colors['success']).pack(anchor=tk.W, pady=1)
             
             # Payroll Summary Section
             summary_section = tk.LabelFrame(parent_frame, text="💰 Payroll Summary", 
@@ -1270,37 +1456,56 @@ For Payroll Sheet:
                 table_frame = tk.Frame(emp_section, bg=self.colors['white'])
                 table_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
                 
-                # Create treeview for payroll data - show key salary components
-                columns = ('ID', 'Name', 'Basic', 'HRA', 'Medical', 'Total Gross')
-                tree = ttk.Treeview(table_frame, columns=columns, show='headings', height=8)
+                # Get COMPLETELY dynamic column headers from first employee
+                first_emp = employee_data[0] if employee_data else {}
+                column_headers = first_emp.get('column_headers', [])
                 
-                # Define headings
-                tree.heading('ID', text='Employee ID')
-                tree.heading('Name', text='Employee Name')
-                tree.heading('Basic', text='Basic Salary')
-                tree.heading('HRA', text='HRA')
-                tree.heading('Medical', text='Medical')
+                if not column_headers:
+                    # Fallback: derive from salary components
+                    salary_components_keys = list(first_emp.get('salary_components', {}).keys())
+                    column_headers = ['Employee ID', 'Employee Name'] + salary_components_keys
+                
+                print(f"🎯 UI DEBUG: Using dynamic columns: {column_headers}")
+                
+                # Create completely dynamic columns + Total Gross
+                dynamic_columns = column_headers + ['Total Gross']
+                tree = ttk.Treeview(table_frame, columns=dynamic_columns, show='headings', height=8)
+                
+                # Define headings dynamically using ACTUAL Excel column names
+                for col_name in column_headers:
+                    tree.heading(col_name, text=col_name)  # Use exact column name from Excel
+                    
+                    # Determine column width and alignment based on position
+                    if 'ID' in col_name.upper() or 'NO' in col_name.upper():
+                        tree.column(col_name, width=80, anchor='center', minwidth=60)
+                    elif 'NAME' in col_name.upper():
+                        tree.column(col_name, width=160, anchor='w', minwidth=120)
+                    else:
+                        tree.column(col_name, width=100, anchor='e', minwidth=80)
+                
+                # Total Gross column
                 tree.heading('Total Gross', text='Total Gross')
-                
-                # Configure column widths
-                tree.column('ID', width=80, anchor='center', minwidth=60)
-                tree.column('Name', width=160, anchor='w', minwidth=120)
-                tree.column('Basic', width=100, anchor='e', minwidth=80)
-                tree.column('HRA', width=100, anchor='e', minwidth=80)
-                tree.column('Medical', width=100, anchor='e', minwidth=80)
                 tree.column('Total Gross', width=120, anchor='e', minwidth=100)
                 
                 # Add data to tree
                 for emp in employee_data:
-                    salary_components = emp.get('salary_components', {})
-                    tree.insert('', tk.END, values=(
-                        emp.get('employee_no', 'N/A'),
-                        emp.get('employee_name', 'N/A'),
-                        f"{salary_components.get('BASIC', 0):,.0f}",
-                        f"{salary_components.get('HRA', 0):,.0f}",
-                        f"{salary_components.get('MEDICAL', 0):,.0f}",
-                        f"{emp.get('total_gross_salary', 0):,.0f}"
-                    ))
+                    all_data = emp.get('all_data', {})
+                    
+                    # Build values list using actual column headers
+                    values = []
+                    for col_name in column_headers:
+                        cell_value = all_data.get(col_name, '')
+                        
+                        # Format based on data type
+                        if isinstance(cell_value, (int, float)):
+                            values.append(f"{cell_value:,.0f}")
+                        else:
+                            values.append(str(cell_value))
+                    
+                    # Add total gross
+                    values.append(f"{emp.get('total_gross_salary', 0):,.0f}")
+                    
+                    tree.insert('', tk.END, values=tuple(values))
                 
                 # Add scrollbar to tree
                 tree_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
