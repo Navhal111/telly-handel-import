@@ -11,12 +11,14 @@ This guide explains how to create a standalone executable file from your Telly H
 ## 🚀 Quick Build (Option 1 - Simple)
 
 ### Using the Batch File:
+
 ```batch
 # Double-click or run:
 build.bat
 ```
 
 This will:
+
 - ✅ Install dependencies
 - ✅ Install PyInstaller
 - ✅ Build the executable
@@ -25,11 +27,13 @@ This will:
 ## 🔧 Enhanced Build (Option 2 - Recommended)
 
 ### Using the Enhanced Python Script:
+
 ```bash
 python build_enhanced.py
 ```
 
 This provides:
+
 - ✅ Better error handling
 - ✅ Progress feedback
 - ✅ Build validation
@@ -38,6 +42,7 @@ This provides:
 ## 📦 Manual Build (Option 3 - Advanced)
 
 ### Step by step:
+
 ```bash
 # 1. Install PyInstaller
 pip install pyinstaller
@@ -64,6 +69,7 @@ dist/
 ## ✅ What's Included in the .exe
 
 The executable bundles:
+
 - ✅ **Python runtime** - No Python installation needed
 - ✅ **All dependencies** - pandas, requests, tkinter, etc.
 - ✅ **Source code** - Your application logic
@@ -79,6 +85,7 @@ The created `.exe` file is **completely standalone**:
 - ✅ **All features work** - Excel processing, Tally integration
 
 ### To distribute:
+
 1. Copy `TellyHandelImport.exe` to target machine
 2. Double-click to run
 3. That's it! 🎉
@@ -101,15 +108,18 @@ The build is configured via `build.spec`:
 ### Common Issues:
 
 1. **"Python not found"**
+
    - Install Python from python.org
    - Ensure Python is in PATH
 
 2. **"PyInstaller not found"**
+
    ```bash
    pip install pyinstaller
    ```
 
 3. **"Build failed"**
+
    - Run: `pip install -r requirements.txt`
    - Try: `pyinstaller build.spec --clean --noconfirm`
 
@@ -118,6 +128,7 @@ The build is configured via `build.spec`:
    - Use `upx=True` for compression (already enabled)
 
 ### Build Logs:
+
 Check `build.log` and `warn-TellyHandelImport.txt` for detailed errors.
 
 ## 📊 Expected Results
@@ -130,6 +141,7 @@ Check `build.log` and `warn-TellyHandelImport.txt` for detailed errors.
 ## 🎯 Success Indicators
 
 After building, verify:
+
 ```bash
 # Check if exe exists
 dir dist\TellyHandelImport.exe
