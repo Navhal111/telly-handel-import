@@ -594,6 +594,236 @@ class TallyApiService:
             self.logger.error(f"❌ Error formatting date: {str(e)}")
             return "20250401"
     
+    def upload_paye_data(self, paye_result: Dict[str, any], company_name: str, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS") -> Dict[str, any]:
+        """
+        Upload PAYE data to Tally.
+        
+        Args:
+            paye_result: Processed PAYE data from Excel processor
+            company_name: Selected company name
+            account_name: Bank account name to use for payment, defaults to Zanzibar bank
+            
+        Returns:
+            Dict containing success status and upload results
+        """
+        try:
+            self.logger.info("Starting PAYE data upload to Tally...")
+            
+            # Generate XML for PAYE payment voucher
+            xml_request = self._generate_paye_xml(paye_result, company_name, account_name)
+            
+            # Send XML to Tally
+            self.logger.info("Sending PAYE XML to Tally...")
+            response = self.session.post(self.base_url, data=xml_request)
+            
+            if response.status_code == 200:
+                # Parse response
+                try:
+                    root = ET.fromstring(response.text)
+                    
+                    # Check for errors in response
+                    error_element = root.find('.//ERROR')
+                    if error_element is not None:
+                        error_msg = error_element.text or "Unknown Tally error"
+                        self.logger.error(f"❌ Tally error: {error_msg}")
+                        return {
+                            "success": False,
+                            "error": f"Tally error: {error_msg}",
+                            "response": response.text
+                        }
+                    
+                    # Check for success indicators
+                    created_element = root.find('.//CREATED')
+                    if created_element is not None and created_element.text == "1":
+                        self.logger.info("✅ PAYE data uploaded successfully to Tally")
+                        return {
+                            "success": True,
+                            "message": "PAYE data uploaded successfully",
+                            "employees_count": paye_result.get("total_employees", 0),
+                            "total_amount": paye_result.get("total_amount", 0),
+                            "response": response.text
+                        }
+                    else:
+                        self.logger.warning("⚠️ Tally response unclear, check manually")
+                        return {
+                            "success": False,
+                            "error": "Unclear response from Tally - please check manually",
+                            "response": response.text
+                        }
+                        
+                except ET.ParseError as e:
+                    self.logger.error(f"❌ Error parsing Tally response: {str(e)}")
+                    return {
+                        "success": False,
+                        "error": f"Error parsing Tally response: {str(e)}",
+                        "response": response.text
+                    }
+            else:
+                self.logger.error(f"❌ HTTP error {response.status_code}: {response.text}")
+                return {
+                    "success": False,
+                    "error": f"HTTP error {response.status_code}",
+                    "response": response.text
+                }
+                
+        except requests.exceptions.ConnectionError:
+            self.logger.error("❌ Could not connect to Tally. Is Tally running?")
+            return {
+                "success": False,
+                "error": "Could not connect to Tally. Please ensure Tally is running and configured properly."
+            }
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"❌ Request error: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Network error: {str(e)}"
+            }
+        except Exception as e:
+            self.logger.error(f"❌ Unexpected error during PAYE upload: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}"
+            }
+
+    def _generate_paye_xml(self, paye_result: Dict[str, any], company_name: str, account_name: str) -> str:
+        """
+        Generate Tally XML for PAYE payment voucher.
+        
+        Args:
+            paye_result: Processed PAYE data
+            company_name: Company name for the voucher
+            account_name: Bank account name for payment
+            
+        Returns:
+            XML string for Tally import
+        """
+        try:
+            # Get employee data and totals
+            employee_data = paye_result.get("employee_data", [])
+            if not employee_data:
+                raise ValueError("No employee data found in PAYE result")
+            
+            total_paye = paye_result.get("total_paye", 0)
+            total_sdl = paye_result.get("total_sdl", 0)
+            total_amount = paye_result.get("total_amount", 0)
+            
+            # Format date
+            voucher_date = self._format_date_for_tally(paye_result.get("date", ""))
+            
+            # Build XML
+            xml_parts = [
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '<ENVELOPE>',
+                ' <HEADER>',
+                '  <TALLYREQUEST>Import Data</TALLYREQUEST>',
+                ' </HEADER>',
+                ' <BODY>',
+                '  <IMPORTDATA>',
+                '   <REQUESTDESC>',
+                '    <REPORTNAME>Vouchers</REPORTNAME>',
+                '    <STATICVARIABLES>',
+                f'     <SVCURRENTCOMPANY>{company_name}</SVCURRENTCOMPANY>',
+                '    </STATICVARIABLES>',
+                '   </REQUESTDESC>',
+                '   <REQUESTDATA>',
+                '    <TALLYMESSAGE xmlns:UDF="TallyUDF">',
+                '     <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Payment" ACTION="Create" OBJVIEW="Accounting Voucher View">',
+                '      <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                '       <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                '      </OLDAUDITENTRYIDS.LIST>',
+                f'      <DATE>{voucher_date}</DATE>',
+                f'      <NARRATION>{paye_result.get("narration", "PAYE and SDL payment")}</NARRATION>',
+                f'      <PARTYLEDGERNAME>{account_name}</PARTYLEDGERNAME>',
+                '      <VOUCHERTYPENAME>Payment</VOUCHERTYPENAME>',
+                '      <VOUCHERNUMBER>1</VOUCHERNUMBER>',
+                '      <PERSISTEDVIEW>Accounting Voucher View</PERSISTEDVIEW>',
+                '      <VCHGSTCLASS/>',
+                '      <ENTEREDBY>Administrator</ENTEREDBY>'
+            ]
+            
+            # Add PAYE ledger entry if there's PAYE amount
+            if total_paye > 0:
+                xml_parts.extend([
+                    '      <ALLLEDGERENTRIES.LIST>',
+                    '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                    '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                    '       </OLDAUDITENTRYIDS.LIST>',
+                    '       <LEDGERNAME>PAYE</LEDGERNAME>',
+                    '       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+                    f'       <AMOUNT>-{total_paye:.2f}</AMOUNT>',
+                    '       <CATEGORYALLOCATIONS.LIST>',
+                    '        <CATEGORY>Primary Cost Category</CATEGORY>',
+                    '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'
+                ])
+                
+                # Add cost center allocations for each employee's PAYE
+                for emp in employee_data:
+                    if emp.get('paye', 0) > 0:
+                        xml_parts.extend([
+                            '        <COSTCENTREALLOCATIONS.LIST>',
+                            f'         <NAME>{emp.get("employee_name", "Unknown")}</NAME>',
+                            f'         <AMOUNT>-{emp.get("paye", 0):.2f}</AMOUNT>',
+                            '        </COSTCENTREALLOCATIONS.LIST>'
+                        ])
+                
+                xml_parts.append('       </CATEGORYALLOCATIONS.LIST>')
+                xml_parts.append('      </ALLLEDGERENTRIES.LIST>')
+            
+            # Add SDL ledger entry if there's SDL amount
+            if total_sdl > 0:
+                xml_parts.extend([
+                    '      <ALLLEDGERENTRIES.LIST>',
+                    '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                    '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                    '       </OLDAUDITENTRYIDS.LIST>',
+                    '       <LEDGERNAME>Skill &amp; Development Levy</LEDGERNAME>',
+                    '       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+                    f'       <AMOUNT>-{total_sdl:.2f}</AMOUNT>',
+                    '       <CATEGORYALLOCATIONS.LIST>',
+                    '        <CATEGORY>Primary Cost Category</CATEGORY>',
+                    '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'
+                ])
+                
+                # Add cost center allocations for each employee's SDL
+                for emp in employee_data:
+                    if emp.get('sdl', 0) > 0:
+                        xml_parts.extend([
+                            '        <COSTCENTREALLOCATIONS.LIST>',
+                            f'         <NAME>{emp.get("employee_name", "Unknown")}</NAME>',
+                            f'         <AMOUNT>-{emp.get("sdl", 0):.2f}</AMOUNT>',
+                            '        </COSTCENTREALLOCATIONS.LIST>'
+                        ])
+                
+                xml_parts.append('       </CATEGORYALLOCATIONS.LIST>')
+                xml_parts.append('      </ALLLEDGERENTRIES.LIST>')
+            
+            # Add Bank ledger entry (credit side)
+            xml_parts.extend([
+                '      <ALLLEDGERENTRIES.LIST>',
+                '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                '       </OLDAUDITENTRYIDS.LIST>',
+                f'       <LEDGERNAME>{account_name}</LEDGERNAME>',
+                '       <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>',
+                '       <ISPARTYLEDGER>Yes</ISPARTYLEDGER>',
+                f'       <AMOUNT>{total_amount:.2f}</AMOUNT>',
+                '      </ALLLEDGERENTRIES.LIST>',
+                '     </VOUCHER>',
+                '    </TALLYMESSAGE>',
+                '   </REQUESTDATA>',
+                '  </IMPORTDATA>',
+                ' </BODY>',
+                '</ENVELOPE>'
+            ])
+            
+            xml_content = '\n'.join(xml_parts)
+            self.logger.info(f"✅ Generated PAYE XML for {len(employee_data)} employees, Total: ₹{total_amount:,.2f}")
+            return xml_content
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error generating PAYE XML: {str(e)}")
+            raise
+
     def get_tally_info(self) -> Dict[str, any]:
         """
         Get basic information about the Tally instance.

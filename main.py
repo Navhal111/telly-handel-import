@@ -95,6 +95,176 @@ class AccountSelectionDialog:
         self.top.destroy()
 
 
+class NarrationDialog:
+    """Dialog for entering narration for XML generation."""
+    
+    def __init__(self, parent, title="Enter Narration", default_text="", optional=False):
+        self.result = None
+        
+        # Create dialog window
+        self.top = tk.Toplevel(parent)
+        self.top.title(title)
+        self.top.geometry("450x250")
+        self.top.resizable(False, False)
+        
+        # Center the dialog
+        self.top.transient(parent)
+        self.top.grab_set()
+        
+        # Create frame
+        frame = ttk.Frame(self.top, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title_label = ttk.Label(frame, text=title, font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # Description
+        desc_text = "Enter the narration text to be included in the XML file:"
+        if optional:
+            desc_text += " (Optional - leave blank if not needed)"
+        
+        desc_label = ttk.Label(frame, text=desc_text, wraplength=400)
+        desc_label.pack(pady=(0, 10))
+        
+        # Narration entry
+        self.narration_var = tk.StringVar(value=default_text)
+        ttk.Label(frame, text="Narration:").pack(anchor='w')
+        self.narration_entry = tk.Text(frame, height=4, width=50, wrap=tk.WORD)
+        self.narration_entry.pack(fill=tk.BOTH, expand=True, pady=(5, 15))
+        self.narration_entry.insert('1.0', default_text)
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X)
+        
+        ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.RIGHT, padx=(5, 0))
+        if optional:
+            ttk.Button(button_frame, text="Skip", command=self.skip).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(button_frame, text="OK", command=self.ok).pack(side=tk.RIGHT)
+        
+        # Focus and bind enter
+        self.narration_entry.focus()
+        self.top.bind('<Escape>', lambda e: self.cancel())
+        
+        # Center the dialog on parent
+        self.center_on_parent(parent)
+    
+    def center_on_parent(self, parent):
+        """Center dialog on parent window."""
+        self.top.update_idletasks()
+        
+        parent_x = parent.winfo_rootx()
+        parent_y = parent.winfo_rooty()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+        
+        dialog_width = self.top.winfo_width()
+        dialog_height = self.top.winfo_height()
+        
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
+        self.top.geometry(f"+{x}+{y}")
+    
+    def ok(self):
+        """Handle OK button."""
+        narration_text = self.narration_entry.get('1.0', tk.END).strip()
+        self.result = narration_text if narration_text else ""
+        self.top.destroy()
+    
+    def skip(self):
+        """Handle Skip button (for optional narration)."""
+        self.result = ""
+        self.top.destroy()
+    
+    def cancel(self):
+        """Handle Cancel button."""
+        self.result = None
+        self.top.destroy()
+
+
+class PayeAccountSelectionDialog:
+    """Dialog for selecting account name for PAYE upload."""
+    
+    def __init__(self, parent):
+        self.result = None
+        
+        # Create dialog window
+        self.top = tk.Toplevel(parent)
+        self.top.title("Select Bank Account")
+        self.top.geometry("450x200")
+        self.top.resizable(False, False)
+        
+        # Center the dialog
+        self.top.transient(parent)
+        self.top.grab_set()
+        
+        # Create frame
+        frame = ttk.Frame(self.top, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title_label = ttk.Label(frame, text="Select Bank Account for PAYE Payment", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # Description
+        desc_label = ttk.Label(frame, text="Enter the bank account name to be used for PAYE/SDL payment:", wraplength=400)
+        desc_label.pack(pady=(0, 10))
+        
+        # Account entry
+        self.account_var = tk.StringVar(value="THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS")  # Default bank account
+        ttk.Label(frame, text="Bank Account Name:").pack(anchor='w')
+        self.account_entry = ttk.Entry(frame, textvariable=self.account_var, width=50)
+        self.account_entry.pack(fill=tk.X, pady=(5, 15))
+        
+        # Buttons
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X)
+        
+        ttk.Button(button_frame, text="Cancel", command=self.cancel).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(button_frame, text="OK", command=self.ok).pack(side=tk.RIGHT)
+        
+        # Focus and bind enter
+        self.account_entry.focus()
+        self.account_entry.bind('<Return>', lambda e: self.ok())
+        self.top.bind('<Escape>', lambda e: self.cancel())
+        
+        # Center the dialog on parent
+        self.center_on_parent(parent)
+    
+    def center_on_parent(self, parent):
+        """Center dialog on parent window."""
+        self.top.update_idletasks()
+        
+        parent_x = parent.winfo_rootx()
+        parent_y = parent.winfo_rooty()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+        
+        dialog_width = self.top.winfo_width()
+        dialog_height = self.top.winfo_height()
+        
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
+        self.top.geometry(f"+{x}+{y}")
+    
+    def ok(self):
+        """Handle OK button."""
+        account_name = self.account_var.get().strip()
+        if account_name:
+            self.result = account_name
+            self.top.destroy()
+        else:
+            messagebox.showerror("Error", "Please enter a bank account name.")
+    
+    def cancel(self):
+        """Handle Cancel button."""
+        self.result = None
+        self.top.destroy()
+
+
 class ModernExcelProcessor:
     def __init__(self):
         self.root = tk.Tk()
@@ -308,7 +478,16 @@ class ModernExcelProcessor:
             style='Success.TButton',
             state='disabled'
         )
-        self.proceed_btn.pack(side=tk.LEFT)
+        self.proceed_btn.pack(side=tk.LEFT, padx=(0, 15))
+        
+        # Skip company selection button for testing
+        self.skip_btn = ttk.Button(
+            btn_container,
+            text="🚀 Skip & Test Upload",
+            command=self.skip_company_selection,
+            style='Secondary.TButton'
+        )
+        self.skip_btn.pack(side=tk.LEFT)
         
         # Status section
         status_frame = tk.Frame(self.company_frame, bg=self.colors['white'])
@@ -412,10 +591,543 @@ class ModernExcelProcessor:
             for widget in self.root.winfo_children():
                 widget.destroy()
             
-            # Create main GUI
-            self.create_gui()
+            # Create new main upload screen
+            self.create_main_upload_screen()
         else:
             messagebox.showwarning("No Company Selected", "Please select a company to proceed.")
+    
+    def skip_company_selection(self):
+        """Skip company selection for testing purposes."""
+        # Set a default test company
+        self.selected_company = "TEST COMPANY (No Tally Connection)"
+        
+        # Clear company selection screen
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Create main upload screen
+        self.create_main_upload_screen()
+    
+    def create_main_upload_screen(self):
+        """Create the main upload screen with attendance and payroll options."""
+        # Main container (more compact)
+        self.main_frame = tk.Frame(self.root, bg=self.colors['light'], padx=20, pady=15)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Header section (more compact)
+        header_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
+        header_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        # Company info banner
+        is_test_mode = "TEST COMPANY" in self.selected_company
+        banner_color = self.colors['warning'] if is_test_mode else self.colors['primary']
+        banner_icon = "🧪" if is_test_mode else "🏢"
+        banner_text = f"{banner_icon} {'Test Mode - ' if is_test_mode else 'Connected to: '}{self.selected_company}"
+        
+        company_banner = tk.Frame(header_frame, bg=banner_color, relief=tk.RAISED, bd=1)
+        company_banner.pack(fill=tk.X, pady=(0, 20))
+        
+        company_info = tk.Label(
+            company_banner,
+            text=banner_text,
+            font=('Arial', 14, 'bold'),
+            bg=banner_color,
+            fg=self.colors['white'],
+            pady=15
+        )
+        company_info.pack()
+        
+        # Title section with Download Example button
+        title_section = tk.Frame(header_frame, bg=self.colors['light'])
+        title_section.pack(fill=tk.X, pady=(0, 10))
+        
+        # Left side - Download Example button
+        download_frame = tk.Frame(title_section, bg=self.colors['light'])
+        download_frame.pack(side=tk.LEFT)
+        
+        download_btn = ttk.Button(
+            download_frame,
+            text="📥 Download Example",
+            command=self.download_example_file,
+            style='Primary.TButton'
+        )
+        download_btn.pack(pady=5)
+        
+        # Center - Title
+        title_center = tk.Frame(title_section, bg=self.colors['light'])
+        title_center.pack(expand=True)
+        
+        # Main title (smaller)
+        title_label = tk.Label(
+            title_center,
+            text="📊 Excel File Processor & XML Generator",
+            font=('Arial', 20, 'bold'),
+            bg=self.colors['light'],
+            fg=self.colors['primary']
+        )
+        title_label.pack()
+        
+        # Subtitle (smaller)
+        subtitle_label = tk.Label(
+            title_center,
+            text="Upload Excel files and generate Tally-compatible XML for import",
+            font=('Arial', 12),
+            bg=self.colors['light'],
+            fg=self.colors['dark']
+        )
+        subtitle_label.pack()
+        
+        # Content container - Grid layout for multiple upload boxes
+        content_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
+        content_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        
+        # Create grid for upload cards (3 cards in a row)
+        # Row 1: Current upload types
+        row1_frame = tk.Frame(content_frame, bg=self.colors['light'])
+        row1_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Left card - Attendance
+        left_frame = tk.Frame(row1_frame, bg=self.colors['light'])
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        # Center card - Payroll  
+        center_frame = tk.Frame(row1_frame, bg=self.colors['light'])
+        center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 5))
+        
+        # Right card - PAYE
+        right_frame = tk.Frame(row1_frame, bg=self.colors['light'])
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # Attendance Section
+        self.create_upload_card(left_frame, "Attendance Upload", "attendance", "📊", 
+                               "Upload attendance Excel files and generate XML for Tally import")
+        
+        # Payroll Section
+        self.create_upload_card(center_frame, "Payroll Upload", "payroll", "💰", 
+                               "Upload payroll Excel files and generate payment XML for Tally import")
+        
+        # PAYE Section
+        self.create_upload_card(right_frame, "PAYE Upload", "paye", "🏛️", 
+                               "Upload PAYE Excel sheet and generate PAYE/SDL payment XML for Tally import")
+        
+        # Row 2: Future upload types (placeholder for now)
+        # row2_frame = tk.Frame(content_frame, bg=self.colors['light'])
+        # row2_frame.pack(fill=tk.X, pady=(10, 0))
+        # 
+        # # Future upload cards will go here when you specify them
+        
+        # Status section at bottom
+        status_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
+        status_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        status_title = tk.Label(
+            status_frame,
+            text="📊 Status",
+            font=('Arial', 16, 'bold'),
+            bg=self.colors['light'],
+            fg=self.colors['primary']
+        )
+        status_title.pack(anchor=tk.W, pady=(0, 10))
+        
+        # Status display
+        self.status_frame = tk.Frame(status_frame, bg=self.colors['white'], relief=tk.SOLID, bd=1)
+        self.status_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        self.status_text = tk.Label(
+            self.status_frame,
+            text="✨ Ready to process Excel files and generate XML...",
+            font=('Arial', 12),
+            bg=self.colors['white'],
+            fg=self.colors['dark'],
+            wraplength=800,
+            justify=tk.LEFT,
+            pady=15,
+            padx=20
+        )
+        self.status_text.pack(anchor=tk.W)
+    
+    def create_upload_card(self, parent, title, upload_type, icon, description):
+        """Create a compact card for file upload functionality."""
+        # Main card container (smaller)
+        card_frame = tk.Frame(parent, bg=self.colors['white'], relief=tk.RAISED, bd=1)
+        card_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Card header (smaller)
+        header = tk.Frame(card_frame, bg=self.colors['primary'])
+        header.pack(fill=tk.X)
+        
+        header_label = tk.Label(
+            header,
+            text=f"{icon} {title}",
+            font=('Arial', 14, 'bold'),
+            bg=self.colors['primary'],
+            fg=self.colors['white'],
+            pady=8
+        )
+        header_label.pack()
+        
+        # Card content (more compact)
+        content = tk.Frame(card_frame, bg=self.colors['white'], padx=15, pady=15)
+        content.pack(fill=tk.BOTH, expand=True)
+        
+        # Description (smaller)
+        desc_label = tk.Label(
+            content,
+            text=description,
+            font=('Arial', 10),
+            bg=self.colors['white'],
+            fg=self.colors['dark'],
+            wraplength=250,
+            justify=tk.LEFT
+        )
+        desc_label.pack(pady=(0, 15))
+        
+        # File selection area (compact)
+        file_frame = tk.Frame(content, bg=self.colors['light'], relief=tk.SUNKEN, bd=1)
+        file_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        # File path variable
+        file_path_var = tk.StringVar(value="No file selected")
+        setattr(self, f"{upload_type}_file_path", file_path_var)
+        setattr(self, f"{upload_type}_result", None)
+        
+        file_label = tk.Label(
+            file_frame,
+            text="📁 Selected File:",
+            font=('Arial', 9, 'bold'),
+            bg=self.colors['light'],
+            fg=self.colors['dark']
+        )
+        file_label.pack(anchor=tk.W, padx=8, pady=(8, 3))
+        
+        file_display = tk.Label(
+            file_frame,
+            textvariable=file_path_var,
+            font=('Arial', 9),
+            bg=self.colors['light'],
+            fg=self.colors['dark'],
+            wraplength=220,
+            justify=tk.LEFT
+        )
+        file_display.pack(anchor=tk.W, padx=8, pady=(0, 8))
+        
+        # Buttons
+        btn_frame = tk.Frame(content, bg=self.colors['white'])
+        btn_frame.pack(fill=tk.X)
+        
+        # Browse button
+        browse_btn = ttk.Button(
+            btn_frame,
+            text="📂 Browse File",
+            command=lambda: self.browse_upload_file(upload_type),
+            style='Primary.TButton'
+        )
+        browse_btn.pack(fill=tk.X, pady=(0, 8))
+        
+        # Process button
+        process_btn = ttk.Button(
+            btn_frame,
+            text=f"⚙️ Process",
+            command=lambda: self.process_upload_file(upload_type),
+            style='Secondary.TButton',
+            state='disabled'
+        )
+        process_btn.pack(fill=tk.X, pady=(0, 8))
+        setattr(self, f"{upload_type}_process_btn", process_btn)
+        
+        # Generate and upload to telly button
+        xml_btn = ttk.Button(
+            btn_frame,
+            text="� Generate and upload to telly",
+            command=lambda: self.generate_xml_file(upload_type),
+            style='Success.TButton',
+            state='disabled'
+        )
+        xml_btn.pack(fill=tk.X, pady=(0, 5))
+        setattr(self, f"{upload_type}_xml_btn", xml_btn)
+    
+    def browse_upload_file(self, upload_type):
+        """Browse and select file for upload."""
+        file_types = [
+            ("Excel files", "*.xlsx *.xls"),
+            ("All files", "*.*")
+        ]
+        
+        file_path = filedialog.askopenfilename(
+            title=f"Select {upload_type.title()} Excel File",
+            filetypes=file_types
+        )
+        
+        if file_path:
+            file_path_var = getattr(self, f"{upload_type}_file_path")
+            file_path_var.set(os.path.basename(file_path))
+            setattr(self, f"{upload_type}_full_path", file_path)
+            
+            # Enable process button
+            process_btn = getattr(self, f"{upload_type}_process_btn")
+            process_btn.configure(state='normal')
+            
+            self.update_status(f"📁 Selected {upload_type} file: {os.path.basename(file_path)}")
+    
+    def process_upload_file(self, upload_type):
+        """Process the uploaded file."""
+        file_path = getattr(self, f"{upload_type}_full_path", None)
+        if not file_path:
+            messagebox.showerror("Error", "Please select a file first.")
+            return
+        
+        # Disable buttons during processing
+        process_btn = getattr(self, f"{upload_type}_process_btn")
+        xml_btn = getattr(self, f"{upload_type}_xml_btn")
+        process_btn.configure(state='disabled', text='Processing...')
+        
+        self.update_status(f"⚙️ Processing {upload_type} file...")
+        
+        # Process in background thread
+        thread = threading.Thread(target=self._process_upload_background, args=(upload_type, file_path))
+        thread.daemon = True
+        thread.start()
+    
+    def _process_upload_background(self, upload_type, file_path):
+        """Process file in background thread."""
+        try:
+            if upload_type == "attendance":
+                result = self.processor.process_attendance_sheet(file_path)
+            elif upload_type == "payroll":
+                result = self.processor.process_payroll_sheet(file_path)
+            else:  # paye
+                result = self.processor.process_paye_sheet(file_path)
+            
+            # Update UI in main thread
+            self.root.after(0, lambda: self._handle_upload_processing_result(upload_type, result))
+            
+        except Exception as e:
+            error_result = {"error": str(e), "success": False}
+            self.root.after(0, lambda: self._handle_upload_processing_result(upload_type, error_result))
+    
+    def _handle_upload_processing_result(self, upload_type, result):
+        """Handle the processing result."""
+        process_btn = getattr(self, f"{upload_type}_process_btn")
+        xml_btn = getattr(self, f"{upload_type}_xml_btn")
+        
+        if result.get("success", False):
+            # Store result
+            setattr(self, f"{upload_type}_result", result)
+            
+            # Update buttons
+            process_btn.configure(state='normal', text=f"✅ Processed")
+            xml_btn.configure(state='normal')
+            
+            # Update status
+            employee_count = result.get("total_employees", 0)
+            if upload_type == "payroll":
+                total_amount = result.get("total_gross_salary", 0)
+                self.update_status(f"✅ {upload_type.title()} processed successfully! "
+                                 f"{employee_count} employees, Total: ₹{total_amount:,.2f}")
+            elif upload_type == "paye":
+                total_paye = result.get("total_paye", 0)
+                total_sdl = result.get("total_sdl", 0)
+                total_amount = result.get("total_amount", 0)
+                self.update_status(f"✅ {upload_type.title()} processed successfully! "
+                                 f"{employee_count} employees, PAYE: ₹{total_paye:,.2f}, SDL: ₹{total_sdl:,.2f}, Total: ₹{total_amount:,.2f}")
+            else:
+                self.update_status(f"✅ {upload_type.title()} processed successfully! "
+                                 f"{employee_count} employees found")
+        else:
+            # Handle error
+            process_btn.configure(state='normal', text=f"❌ Error - Retry")
+            error_msg = result.get("error", "Unknown error occurred")
+            self.update_status(f"❌ Error processing {upload_type}: {error_msg}")
+            messagebox.showerror("Processing Error", f"Failed to process {upload_type} file:\n{error_msg}")
+    
+    def generate_xml_file(self, upload_type):
+        """Generate XML file from processed data."""
+        result = getattr(self, f"{upload_type}_result", None)
+        if not result:
+            messagebox.showerror("Error", f"Please process the {upload_type} file first.")
+            return
+        
+        try:
+            self.update_status(f"🔄 Generating {upload_type} XML...")
+            
+            # Use selected company name, or extract from result if testing
+            company_name = self.selected_company
+            if "TEST COMPANY" in company_name:
+                company_name = result.get("company_name", "TEST COMPANY")
+            
+            # Ask for NARRATION
+            if upload_type == "attendance":
+                # For attendance, show popup to ask for narration
+                narration_dialog = NarrationDialog(
+                    self.root, 
+                    title="Enter Attendance Narration",
+                    default_text="Attendance for " + result.get("date", "current period"),
+                    optional=False
+                )
+                self.root.wait_window(narration_dialog.top)
+                narration = narration_dialog.result
+                
+                if narration is None:  # User cancelled
+                    return
+                
+                xml_content = self.processor.generate_attendance_xml(result, company_name, narration)
+            elif upload_type == "payroll":
+                # For payroll, ask for account name
+                account_name = self.get_account_name_for_payroll()
+                if not account_name:
+                    return
+                
+                # Ask for narration (optional for payroll)
+                narration_dialog = NarrationDialog(
+                    self.root, 
+                    title="Enter Payroll Narration (Optional)",
+                    default_text="Payroll for " + result.get("date", "current period"),
+                    optional=True
+                )
+                self.root.wait_window(narration_dialog.top)
+                narration = narration_dialog.result
+                
+                if narration is None:  # User cancelled
+                    return
+                
+                xml_content = self.processor.generate_payroll_xml(result, company_name, account_name, narration)
+            else:  # paye
+                # For PAYE, ask for account name
+                account_name = self.get_account_name_for_paye()
+                if not account_name:
+                    return
+                
+                # Ask for narration (optional for PAYE)
+                narration_dialog = NarrationDialog(
+                    self.root, 
+                    title="Enter PAYE Narration (Optional)",
+                    default_text="PAYE and SDL for " + result.get("date", "current period"),
+                    optional=True
+                )
+                self.root.wait_window(narration_dialog.top)
+                narration = narration_dialog.result
+                
+                if narration is None:  # User cancelled
+                    return
+                
+                xml_content = self.processor.generate_paye_xml(result, company_name, account_name, narration)
+            
+            if xml_content:
+                # Always save XML file first (regardless of Tally server status)
+                output_path = self.processor.save_xml_file(xml_content, upload_type)
+                if output_path:
+                    # Show success message for XML generation
+                    file_type_name = "PAYE" if upload_type == "paye" else upload_type.title()
+                    self.update_status(f"✅ {file_type_name} XML file created: {output_path}")
+                    
+                    # Show immediate success dialog with XML file info
+                    messagebox.showinfo("XML Generated Successfully", 
+                                      f"{file_type_name} XML file has been generated and saved!\n\n"
+                                      f"File: {output_path}\n\n"
+                                      f"You can import this file directly into Tally or continue with automatic upload.")
+                    
+                    # Now attempt to upload to Tally
+                    self.update_status(f"🚀 Attempting to upload {file_type_name} to Tally server...")
+                    
+                    try:
+                        if upload_type == "attendance":
+                            upload_result = self.api_service.upload_attendance_data(result, company_name)
+                        elif upload_type == "payroll":
+                            upload_result = self.api_service.upload_payroll_data(result, company_name, account_name)
+                        else:  # paye
+                            upload_result = self.api_service.upload_paye_data(result, company_name, account_name)
+                        
+                        if upload_result and upload_result.get("success"):
+                            self.update_status(f"🎉 {file_type_name} successfully uploaded to Tally server!")
+                            messagebox.showinfo("Upload Successful", 
+                                              f"{file_type_name} data has been successfully uploaded to Tally!\n\n"
+                                              f"✅ XML file saved: {output_path}\n"
+                                              f"✅ Data uploaded to Tally server\n\n"
+                                              f"The voucher should now be available in Tally.")
+                        else:
+                            error_msg = upload_result.get("error", "Unknown upload error") if upload_result else "Upload failed"
+                            self.update_status(f"⚠️ {file_type_name} XML saved, but Tally upload failed: {error_msg}")
+                            
+                            # Show option to open file location
+                            if messagebox.askyesno("Upload Failed - XML Saved", 
+                                                 f"Tally upload failed: {error_msg}\n\n"
+                                                 f"✅ XML file has been saved successfully: {output_path}\n\n"
+                                                 f"You can manually import this file into Tally.\n"
+                                                 f"Would you like to open the file location?"):
+                                import subprocess
+                                subprocess.run(["open", "-R", output_path])  # macOS
+                                
+                    except Exception as upload_error:
+                        self.update_status(f"⚠️ {file_type_name} XML saved, but Tally server error: {str(upload_error)}")
+                        
+                        # Show option to open file location
+                        if messagebox.askyesno("Tally Server Error - XML Saved", 
+                                             f"Could not connect to Tally server: {str(upload_error)}\n\n"
+                                             f"✅ XML file has been saved successfully: {output_path}\n\n"
+                                             f"You can manually import this file into Tally when the server is available.\n"
+                                             f"Would you like to open the file location?"):
+                            import subprocess
+                            subprocess.run(["open", "-R", output_path])  # macOS
+                else:
+                    messagebox.showerror("Error", "Failed to save XML file.")
+            else:
+                messagebox.showerror("Error", "Failed to generate XML content.")
+                
+        except Exception as e:
+            self.update_status(f"❌ Error generating XML: {str(e)}")
+            messagebox.showerror("XML Generation Error", f"Failed to generate XML:\n{str(e)}")
+    
+    def get_account_name_for_payroll(self):
+        """Get account name for payroll payment."""
+        dialog = AccountSelectionDialog(self.root)
+        self.root.wait_window(dialog.top)
+        return dialog.result
+    
+    def get_account_name_for_paye(self):
+        """Get account name for PAYE payment."""
+        dialog = PayeAccountSelectionDialog(self.root)
+        self.root.wait_window(dialog.top)
+        return dialog.result
+    
+    def download_example_file(self):
+        """Download the example Excel file (STAFF SALARY 2025-12.xlsx) to Downloads folder."""
+        try:
+            import shutil
+            import os
+            
+            # Source file path
+            source_file = "/Users/goku/Documents/excel_processor/src/Payroll Voucher/STAFF SALARY 2025-12.xlsx"
+            
+            # Destination path (Downloads folder)
+            downloads_folder = os.path.expanduser("~/Downloads")
+            destination_file = os.path.join(downloads_folder, "STAFF SALARY 2025-12.xlsx")
+            
+            # Copy the file
+            shutil.copy2(source_file, destination_file)
+            
+            # Show success message
+            messagebox.showinfo(
+                "Example Downloaded", 
+                f"Example file downloaded successfully!\n\n"
+                f"File: STAFF SALARY 2025-12.xlsx\n"
+                f"Location: {destination_file}\n\n"
+                f"This is the real format used for payroll processing."
+            )
+            
+            # Update status
+            self.update_status(f"📁 Example file downloaded: STAFF SALARY 2025-12.xlsx")
+            
+            # Open the file location
+            import subprocess
+            subprocess.run(["open", "-R", destination_file])  # macOS
+            
+        except Exception as e:
+            messagebox.showerror("Download Error", f"Error downloading example file: {str(e)}")
+    
+    def update_status(self, message):
+        """Update the status display."""
+        self.status_text.configure(text=message)
+        self.root.update_idletasks()
     
     def create_gui(self):
         """Create the main GUI interface."""
@@ -458,12 +1170,31 @@ class ModernExcelProcessor:
             )
             change_company_btn.pack(anchor=tk.E)
         
-        # Title with icon - bigger and more prominent
-        title_label = ttk.Label(header_frame, text="📊 Excel File Processor", style='Title.TLabel')
-        title_label.pack(pady=(0, 5))
+        # Title section with Download Example button
+        title_section = tk.Frame(header_frame, bg=self.colors['light'])
+        title_section.pack(fill=tk.X, pady=(0, 5))
         
-        subtitle_label = ttk.Label(header_frame, text="Upload and process Attendance or Payroll Excel files with intelligent data extraction", style='Subtitle.TLabel')
-        subtitle_label.pack(pady=(0, 3))
+        # Left side - Download Example button
+        download_frame = tk.Frame(title_section, bg=self.colors['light'])
+        download_frame.pack(side=tk.LEFT)
+        
+        download_btn = ttk.Button(
+            download_frame,
+            text="📥 Download Example",
+            command=self.download_example_file,
+            style='Primary.TButton'
+        )
+        download_btn.pack(pady=5)
+        
+        # Center - Title
+        title_center = tk.Frame(title_section, bg=self.colors['light'])
+        title_center.pack(expand=True)
+        
+        title_label = ttk.Label(title_center, text="📊 Excel File Processor & XML Generator", style='Title.TLabel')
+        title_label.pack()
+        
+        subtitle_label = ttk.Label(title_center, text="Upload Excel files and generate Tally-compatible XML for import", style='Subtitle.TLabel')
+        subtitle_label.pack()
         
         # # Description line
         # desc_label = ttk.Label(header_frame, text="Supports header extraction, employee data processing, and JSON export", style='Info.TLabel')
@@ -983,135 +1714,9 @@ class ModernExcelProcessor:
                 self.results_text.insert(tk.END, f"   • Row 3: Narration in column B (e.g., Test attendance)\n")
                 self.results_text.insert(tk.END, f"   • Row 5+: Employee data with headers:\n")
     
-    def download_sample(self, section_type):
-        """Download and open a sample Excel file for the specified section type."""
-        try:
-            sample_file = None
-            
-            if section_type == "attendance":
-                # Create attendance sample
-                sample_file = self.create_attendance_sample()
-                sample_name = "Sample_Attendance.xlsx"
-            elif section_type == "payroll":
-                # Create payroll sample
-                sample_file = self.create_payroll_sample()
-                sample_name = "Sample_Payroll.xlsx"
-            
-            if sample_file:
-                # Show success message
-                messagebox.showinfo(
-                    "Sample Downloaded", 
-                    f"Sample {section_type} file created successfully!\n\n"
-                    f"File: {sample_name}\n"
-                    f"Location: {sample_file}\n\n"
-                    f"The file has been opened for you to view the expected format."
-                )
-                
-                # Update status
-                self.add_result(f"📁 Sample {section_type} file downloaded: {sample_name}")
-                
-                # Open the file with default application
-                import subprocess
-                import platform
-                
-                if platform.system() == 'Darwin':  # macOS
-                    subprocess.run(['open', sample_file])
-                elif platform.system() == 'Windows':  # Windows
-                    subprocess.run(['start', sample_file], shell=True)
-                else:  # Linux
-                    subprocess.run(['xdg-open', sample_file])
-            
-        except Exception as e:
-            messagebox.showerror("Download Error", f"Error creating sample file: {str(e)}")
+
     
-    def create_attendance_sample(self):
-        """Create a sample attendance Excel file."""
-        from openpyxl import Workbook
-        import os
-        
-        wb = Workbook()
-        ws = wb.active
-        
-        # Header rows
-        ws['A1'] = "Date"
-        ws['B1'] = "09-10-2025"
-        
-        ws['A2'] = "Company Name"
-        ws['B2'] = "LIGHT"
-        
-        ws['A3'] = "Narration"
-        ws['B3'] = "Test attendance"
-        
-        # Row 5: Employee headers
-        ws['A5'] = "EMPL NO"
-        ws['B5'] = "EMPLOYEE NAME"
-        ws['C5'] = "Attendance/Production Types"
-        ws['D5'] = "Attendance Days"
-        
-        # Sample employee data
-        employees = [
-            [1, "Ritesh", "Present", 23],
-            [2, "Milan", "Absent", 22], 
-            [3, "Anil", "Overtime @ 1.25", 23],
-            [4, "Utkarsh", "Overtime @ 1.50", 12],
-            [5, "John", "Present", 25],
-            [6, "Sarah", "Half Day", 15]
-        ]
-        
-        for i, emp in enumerate(employees, start=6):
-            ws[f'A{i}'] = emp[0]
-            ws[f'B{i}'] = emp[1]
-            ws[f'C{i}'] = emp[2]
-            ws[f'D{i}'] = emp[3]
-        
-        # Save file
-        output_path = os.path.join(os.path.expanduser("~/Downloads"), "Sample_Attendance.xlsx")
-        wb.save(output_path)
-        return output_path
-    
-    def create_payroll_sample(self):
-        """Create a sample payroll Excel file."""
-        from openpyxl import Workbook
-        import os
-        
-        wb = Workbook()
-        ws = wb.active
-        
-        # Header rows
-        ws['A1'] = "Date"
-        ws['B1'] = "09-10-2025"
-        
-        ws['A2'] = "Company Name"
-        ws['B2'] = "LIGHT"
-        
-        ws['A3'] = "Account"
-        ws['B3'] = "PEAPULE BANK OF UNITE"
-        
-        ws['A4'] = "Narration"
-        ws['B4'] = "Monthly Payroll"
-        
-        # Row 6: Payroll headers
-        headers = ['EMPL NO', 'EMPLOYEE NAME', 'BASIC', 'HRA', 'MEDICAL', 'RESPONSIBILITY', 'FUEL', 'ZSSF @ 7%', 'ZHSF @ 3.5%', 'PAYE']
-        for col, header in enumerate(headers, start=1):
-            ws.cell(row=6, column=col, value=header)
-        
-        # Sample payroll data
-        employees = [
-            [1, "Ritesh", 2200000, 440000, 660000, 1000000, 250000, 154000, 154000, 823700],
-            [2, "Milan", 4200000, 140000, 98000, 1000000, 0, 67000, 98250, 563100],
-            [3, "John", 1800000, 360000, 540000, 800000, 200000, 126000, 126000, 690000],
-            [4, "Sarah", 3500000, 120000, 85000, 900000, 0, 58000, 85500, 485000],
-            [5, "Mike", 2800000, 560000, 420000, 1200000, 300000, 196000, 196000, 1050000]
-        ]
-        
-        for row_idx, emp in enumerate(employees, start=7):
-            for col_idx, value in enumerate(emp, start=1):
-                ws.cell(row=row_idx, column=col_idx, value=value)
-        
-        # Save file
-        output_path = os.path.join(os.path.expanduser("~/Downloads"), "Sample_Payroll.xlsx")
-        wb.save(output_path)
-        return output_path
+
     
     def show_main_screen(self):
         """Show the main screen (hide data screen)."""
