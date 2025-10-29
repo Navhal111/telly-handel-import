@@ -1790,6 +1790,646 @@ class ExcelProcessor:
             print(f"❌ Error saving XML file: {str(e)}")
             return ""
 
+    def generate_zhsf_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None) -> str:
+        """Generate Tally XML for ZHSF voucher from processed ZHSF data - Payment Voucher Format."""
+        try:
+            if not result.get("success", False):
+                raise ValueError("Invalid result data")
+            
+            employee_data = result.get("employee_data", [])
+            if not employee_data:
+                raise ValueError("No employee data found")
+            
+            # Extract header info with safe string handling
+            voucher_date = result.get("date", "2025-12-01")
+            comp_name = company_name or result.get("company_name", "TEST COMPANY")
+            narration_text = narration or result.get("narration", "ZHSF for December 2025")
+            
+            # Ensure all string values are not None
+            if comp_name is None or comp_name == "":
+                comp_name = "TEST COMPANY"
+            if narration_text is None or narration_text == "":
+                narration_text = "ZHSF for December 2025"
+            if account_name is None or account_name == "":
+                account_name = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS"
+            
+            # Format date for Tally (YYYYMMDD)
+            if isinstance(voucher_date, str):
+                try:
+                    from datetime import datetime
+                    if '-' in voucher_date:
+                        dt = datetime.strptime(voucher_date, "%Y-%m-%d")
+                    elif '/' in voucher_date:
+                        dt = datetime.strptime(voucher_date, "%d/%m/%Y")
+                    else:
+                        dt = datetime.strptime("30/12/2025", "%d/%m/%Y")
+                    formatted_date = dt.strftime("%Y%m%d")
+                except:
+                    formatted_date = "20251230"
+            else:
+                formatted_date = "20251230"
+            
+            # Calculate totals for ZHSF - Employee 3.5% and TWA 3.5%
+            total_employee_zhsf = sum(emp.get('employee_35', 0) for emp in employee_data)
+            total_twa_zhsf = sum(emp.get('twa_35', 0) for emp in employee_data)
+            total_amount = total_employee_zhsf + total_twa_zhsf
+            
+            # Build XML content
+            xml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+ <HEADER>
+  <TALLYREQUEST>Import Data</TALLYREQUEST>
+ </HEADER>
+ <BODY>
+  <IMPORTDATA>
+   <REQUESTDESC>
+    <REPORTNAME>Vouchers</REPORTNAME>
+    <STATICVARIABLES>
+     <SVCURRENTCOMPANY>{comp_name}</SVCURRENTCOMPANY>
+    </STATICVARIABLES>
+   </REQUESTDESC>
+   <REQUESTDATA>
+    <TALLYMESSAGE xmlns:UDF="TallyUDF">
+     <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Payment" ACTION="Create" OBJVIEW="Accounting Voucher View">
+      <OLDAUDITENTRYIDS.LIST TYPE="Number">
+       <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>
+      </OLDAUDITENTRYIDS.LIST>
+      <DATE>{formatted_date}</DATE>
+      <NARRATION>{narration_text}</NARRATION>
+      <PARTYLEDGERNAME>{account_name}</PARTYLEDGERNAME>
+      <VOUCHERTYPENAME>Payment</VOUCHERTYPENAME>
+      <VOUCHERNUMBER>1</VOUCHERNUMBER>
+      <CSTFORMISSUETYPE/>
+      <CSTFORMRECVTYPE/>
+      <FBTPAYMENTTYPE>Default</FBTPAYMENTTYPE>
+      <PERSISTEDVIEW>Accounting Voucher View</PERSISTEDVIEW>
+      <VCHGSTCLASS/>
+      <ENTEREDBY>Administrator</ENTEREDBY>
+      <DIFFACTUALQTY>No</DIFFACTUALQTY>
+      <ISMSTFROMSYNC>No</ISMSTFROMSYNC>
+      <ASORIGINAL>No</ASORIGINAL>
+      <AUDITED>No</AUDITED>
+      <FORJOBCOSTING>No</FORJOBCOSTING>
+      <ISOPTIONAL>No</ISOPTIONAL>
+      <EFFECTIVEDATE>{formatted_date}</EFFECTIVEDATE>
+      <USEFOREXCISE>No</USEFOREXCISE>
+      <ISFORJOBWORKIN>No</ISFORJOBWORKIN>
+      <ALLOWCONSUMPTION>No</ALLOWCONSUMPTION>
+      <USEFORINTEREST>No</USEFORINTEREST>
+      <USEFORGAINLOSS>No</USEFORGAINLOSS>
+      <USEFORGODOWNTRANSFER>No</USEFORGODOWNTRANSFER>
+      <USEFORCOMPOUND>No</USEFORCOMPOUND>
+      <USEFORSERVICETAX>No</USEFORSERVICETAX>
+      <ISDELETED>No</ISDELETED>
+      <ISONHOLD>No</ISONHOLD>
+      <ISBOENOTAPPLICABLE>No</ISBOENOTAPPLICABLE>
+      <ISEXCISEVOUCHER>No</ISEXCISEVOUCHER>
+      <EXCISETAXOVERRIDE>No</EXCISETAXOVERRIDE>
+      <USEFORTAXUNITTRANSFER>No</USEFORTAXUNITTRANSFER>
+      <IGNOREPOSVALIDATION>No</IGNOREPOSVALIDATION>
+      <EXCISEOPENING>No</EXCISEOPENING>
+      <USEFORFINALPRODUCTION>No</USEFORFINALPRODUCTION>
+      <ISTDSOVERRIDDEN>No</ISTDSOVERRIDDEN>
+      <ISTCSOVERRIDDEN>No</ISTCSOVERRIDDEN>
+      <ISTDSTCSCASHVCH>No</ISTDSTCSCASHVCH>
+      <INCLUDEADVPYMTVCH>No</INCLUDEADVPYMTVCH>
+      <ISSUBWORKSCONTRACT>No</ISSUBWORKSCONTRACT>
+      <ISVATOVERRIDDEN>No</ISVATOVERRIDDEN>
+      <IGNOREORIGVCHDATE>No</IGNOREORIGVCHDATE>
+      <ISVATPAIDATCUSTOMS>No</ISVATPAIDATCUSTOMS>
+      <ISDECLAREDTOCUSTOMS>No</ISDECLAREDTOCUSTOMS>
+      <ISSERVICETAXOVERRIDDEN>No</ISSERVICETAXOVERRIDDEN>
+      <ISISDVOUCHER>No</ISISDVOUCHER>
+      <ISEXCISEOVERRIDDEN>No</ISEXCISEOVERRIDDEN>
+      <ISEXCISESUPPLYVCH>No</ISEXCISESUPPLYVCH>
+      <ISGSTOVERRIDDEN>No</ISGSTOVERRIDDEN>
+      <GSTNOTEXPORTED>No</GSTNOTEXPORTED>
+      <IGNOREGSTINVALIDATION>No</IGNOREGSTINVALIDATION>
+      <ISGSTREFUND>No</ISGSTREFUND>
+      <ISGSTSECSEVENAPPLICABLE>No</ISGSTSECSEVENAPPLICABLE>
+      <ISVATPRINCIPALACCOUNT>No</ISVATPRINCIPALACCOUNT>
+      <ISSHIPPINGWITHINSTATE>No</ISSHIPPINGWITHINSTATE>
+      <ISOVERSEASTOURISTTRANS>No</ISOVERSEASTOURISTTRANS>
+      <ISDESIGNATEDZONEPARTY>No</ISDESIGNATEDZONEPARTY>
+      <ISCANCELLED>No</ISCANCELLED>
+      <HASCASHFLOW>Yes</HASCASHFLOW>
+      <ISPOSTDATED>No</ISPOSTDATED>
+      <USETRACKINGNUMBER>No</USETRACKINGNUMBER>
+      <ISINVOICE>No</ISINVOICE>
+      <MFGJOURNAL>No</MFGJOURNAL>
+      <HASDISCOUNTS>No</HASDISCOUNTS>
+      <ASPAYSLIP>No</ASPAYSLIP>
+      <ISCOSTCENTRE>No</ISCOSTCENTRE>
+      <ISSTXNONREALIZEDVCH>No</ISSTXNONREALIZEDVCH>
+      <ISEXCISEMANUFACTURERON>No</ISEXCISEMANUFACTURERON>
+      <ISBLANKCHEQUE>No</ISBLANKCHEQUE>
+      <ISVOID>No</ISVOID>
+      <ORDERLINESTATUS>No</ORDERLINESTATUS>
+      <VATISAGNSTCANCSALES>No</VATISAGNSTCANCSALES>
+      <VATISPURCEXEMPTED>No</VATISPURCEXEMPTED>
+      <ISVATRESTAXINVOICE>No</ISVATRESTAXINVOICE>
+      <VATISASSESABLECALCVCH>No</VATISASSESABLECALCVCH>
+      <ISVATDUTYPAID>Yes</ISVATDUTYPAID>
+      <ISDELIVERYSAMEASCONSIGNEE>No</ISDELIVERYSAMEASCONSIGNEE>
+      <ISDISPATCHSAMEASCONSIGNOR>No</ISDISPATCHSAMEASCONSIGNOR>
+      <CHANGEVCHMODE>No</CHANGEVCHMODE>
+      <ALLLEDGERENTRIES.LIST>
+       <OLDAUDITENTRYIDS.LIST TYPE="Number">
+        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>
+       </OLDAUDITENTRYIDS.LIST>
+       <LEDGERNAME>ZHSF Employee @ 3.5%</LEDGERNAME>
+       <GSTCLASS/>
+       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+       <LEDGERFROMITEM>No</LEDGERFROMITEM>
+       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
+       <ISPARTYLEDGER>No</ISPARTYLEDGER>
+       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>
+       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>
+       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>
+       <AMOUNT>-{total_employee_zhsf:.2f}</AMOUNT>
+       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>
+       <CATEGORYALLOCATIONS.LIST>
+        <CATEGORY>Primary Cost Category</CATEGORY>
+        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'''
+
+            # Add cost center allocations for each employee (Employee 3.5%)
+            for emp in employee_data:
+                emp_name = emp.get('employee_name', 'Unknown')
+                emp_employee_zhsf = emp.get('employee_35', 0)
+                if emp_employee_zhsf > 0:
+                    xml_content += f'''
+        <COSTCENTREALLOCATIONS.LIST>
+         <NAME>{emp_name}</NAME>
+         <AMOUNT>-{emp_employee_zhsf:.2f}</AMOUNT>
+        </COSTCENTREALLOCATIONS.LIST>'''
+
+            xml_content += f'''
+       </CATEGORYALLOCATIONS.LIST>
+       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>
+       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>
+       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>
+       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>
+       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>
+       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>
+       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>
+       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>
+       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>
+       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>
+       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>
+       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>
+       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>
+       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>
+       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>
+       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>
+       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>
+       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>
+       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>
+       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>
+       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>
+       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>
+      </ALLLEDGERENTRIES.LIST>
+      <ALLLEDGERENTRIES.LIST>
+       <OLDAUDITENTRYIDS.LIST TYPE="Number">
+        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>
+       </OLDAUDITENTRYIDS.LIST>
+       <LEDGERNAME>ZHSF TWA @ 3.5%</LEDGERNAME>
+       <GSTCLASS/>
+       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+       <LEDGERFROMITEM>No</LEDGERFROMITEM>
+       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
+       <ISPARTYLEDGER>No</ISPARTYLEDGER>
+       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>
+       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>
+       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>
+       <AMOUNT>-{total_twa_zhsf:.2f}</AMOUNT>
+       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>
+       <CATEGORYALLOCATIONS.LIST>
+        <CATEGORY>Primary Cost Category</CATEGORY>
+        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'''
+
+            # Add cost center allocations for each employee (TWA 3.5%)
+            for emp in employee_data:
+                emp_name = emp.get('employee_name', 'Unknown')
+                emp_twa_zhsf = emp.get('twa_35', 0)
+                if emp_twa_zhsf > 0:
+                    xml_content += f'''
+        <COSTCENTREALLOCATIONS.LIST>
+         <NAME>{emp_name}</NAME>
+         <AMOUNT>-{emp_twa_zhsf:.2f}</AMOUNT>
+        </COSTCENTREALLOCATIONS.LIST>'''
+
+            xml_content += f'''
+       </CATEGORYALLOCATIONS.LIST>
+       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>
+       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>
+       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>
+       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>
+       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>
+       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>
+       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>
+       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>
+       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>
+       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>
+       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>
+       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>
+       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>
+       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>
+       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>
+       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>
+       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>
+       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>
+       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>
+       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>
+       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>
+       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>
+      </ALLLEDGERENTRIES.LIST>
+      <ALLLEDGERENTRIES.LIST>
+       <OLDAUDITENTRYIDS.LIST TYPE="Number">
+        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>
+       </OLDAUDITENTRYIDS.LIST>
+       <LEDGERNAME>{account_name}</LEDGERNAME>
+       <GSTCLASS/>
+       <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+       <LEDGERFROMITEM>No</LEDGERFROMITEM>
+       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
+       <ISPARTYLEDGER>Yes</ISPARTYLEDGER>
+       <ISLASTDEEMEDPOSITIVE>No</ISLASTDEEMEDPOSITIVE>
+       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>
+       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>
+       <AMOUNT>{total_amount:.2f}</AMOUNT>
+       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>
+       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>
+       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>
+       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>
+       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>
+       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>
+       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>
+       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>
+       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>
+       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>
+       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>
+       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>
+       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>
+       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>
+       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>
+       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>
+       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>
+       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>
+       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>
+       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>
+       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>
+       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>
+       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>
+      </ALLLEDGERENTRIES.LIST>
+      <PAYROLLMODEOFPAYMENT.LIST>      </PAYROLLMODEOFPAYMENT.LIST>
+      <ATTDRECORDS.LIST>      </ATTDRECORDS.LIST>
+      <GSTEWAYCONSIGNORADDRESS.LIST>      </GSTEWAYCONSIGNORADDRESS.LIST>
+      <GSTEWAYCONSIGNEEADDRESS.LIST>      </GSTEWAYCONSIGNEEADDRESS.LIST>
+      <TEMPGSTRATEDETAILS.LIST>      </TEMPGSTRATEDETAILS.LIST>
+     </VOUCHER>
+    </TALLYMESSAGE>
+   </REQUESTDATA>
+  </IMPORTDATA>
+ </BODY>
+</ENVELOPE>'''
+            
+            return xml_content
+            
+        except Exception as e:
+            print(f"❌ Error generating ZHSF XML: {str(e)}")
+            return ""
+
+    def generate_zssf_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None) -> str:
+        """Generate Tally XML for ZSSF voucher from processed ZSSF data - Payment Voucher Format."""
+        try:
+            if not result.get("success", False):
+                raise ValueError("Invalid result data")
+            
+            employee_data = result.get("employee_data", [])
+            if not employee_data:
+                raise ValueError("No employee data found")
+            
+            # Extract header info with safe string handling
+            voucher_date = result.get("date", "2025-12-01")
+            comp_name = company_name or result.get("company_name", "TEST COMPANY")
+            narration_text = narration or result.get("narration", "ZSSF for December 2025")
+            
+            # Ensure all string values are not None
+            if comp_name is None or comp_name == "":
+                comp_name = "TEST COMPANY"
+            if narration_text is None or narration_text == "":
+                narration_text = "ZSSF for December 2025"
+            if account_name is None or account_name == "":
+                account_name = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS"
+            
+            # Format date for Tally (YYYYMMDD)
+            if isinstance(voucher_date, str):
+                try:
+                    from datetime import datetime
+                    if '-' in voucher_date:
+                        dt = datetime.strptime(voucher_date, "%Y-%m-%d")
+                    elif '/' in voucher_date:
+                        dt = datetime.strptime(voucher_date, "%d/%m/%Y")
+                    else:
+                        dt = datetime.strptime("30/12/2025", "%d/%m/%Y")
+                    formatted_date = dt.strftime("%Y%m%d")
+                except:
+                    formatted_date = "20251230"
+            else:
+                formatted_date = "20251230"
+            
+            # Calculate totals for ZSSF
+            total_employee_zssf = sum(emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0) for emp in employee_data)
+            total_employer_zssf = total_employee_zssf  # Employer matches employee contribution
+            total_amount = total_employee_zssf + total_employer_zssf
+            
+            # Start building XML for ZSSF Payment voucher
+            xml_lines = [
+                '<?xml version="1.0" encoding="UTF-8"?>',
+                '<ENVELOPE>',
+                ' <HEADER>',
+                '  <TALLYREQUEST>Import Data</TALLYREQUEST>',
+                ' </HEADER>',
+                ' <BODY>',
+                '  <IMPORTDATA>',
+                '   <REQUESTDESC>',
+                '    <REPORTNAME>Vouchers</REPORTNAME>',
+                '    <STATICVARIABLES>',
+                f'     <SVCURRENTCOMPANY>{comp_name}</SVCURRENTCOMPANY>',
+                '    </STATICVARIABLES>',
+                '   </REQUESTDESC>',
+                '   <REQUESTDATA>',
+                '    <TALLYMESSAGE xmlns:UDF="TallyUDF">',
+                '     <VOUCHER REMOTEID="" VCHKEY="" VCHTYPE="Payment" ACTION="Create" OBJVIEW="Accounting Voucher View">',
+                '      <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                '       <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                '      </OLDAUDITENTRYIDS.LIST>',
+                f'      <DATE>{formatted_date}</DATE>',
+                f'      <NARRATION>{narration_text}</NARRATION>',
+                f'      <PARTYLEDGERNAME>{account_name}</PARTYLEDGERNAME>',
+                '      <VOUCHERTYPENAME>Payment</VOUCHERTYPENAME>',
+                '      <VOUCHERNUMBER>1</VOUCHERNUMBER>',
+                '      <CSTFORMISSUETYPE/>',
+                '      <CSTFORMRECVTYPE/>',
+                '      <FBTPAYMENTTYPE>Default</FBTPAYMENTTYPE>',
+                '      <PERSISTEDVIEW>Accounting Voucher View</PERSISTEDVIEW>',
+                '      <VCHGSTCLASS/>',
+                '      <ENTEREDBY>Administrator</ENTEREDBY>',
+                '      <DIFFACTUALQTY>No</DIFFACTUALQTY>',
+                '      <ISMSTFROMSYNC>No</ISMSTFROMSYNC>',
+                '      <ASORIGINAL>No</ASORIGINAL>',
+                '      <AUDITED>No</AUDITED>',
+                '      <FORJOBCOSTING>No</FORJOBCOSTING>',
+                '      <ISOPTIONAL>No</ISOPTIONAL>',
+                f'      <EFFECTIVEDATE>{formatted_date}</EFFECTIVEDATE>',
+                '      <USEFOREXCISE>No</USEFOREXCISE>',
+                '      <ISFORJOBWORKIN>No</ISFORJOBWORKIN>',
+                '      <ALLOWCONSUMPTION>No</ALLOWCONSUMPTION>',
+                '      <USEFORINTEREST>No</USEFORINTEREST>',
+                '      <USEFORGAINLOSS>No</USEFORGAINLOSS>',
+                '      <USEFORGODOWNTRANSFER>No</USEFORGODOWNTRANSFER>',
+                '      <USEFORCOMPOUND>No</USEFORCOMPOUND>',
+                '      <USEFORSERVICETAX>No</USEFORSERVICETAX>',
+                '      <ISDELETED>No</ISDELETED>',
+                '      <ISONHOLD>No</ISONHOLD>',
+                '      <ISBOENOTAPPLICABLE>No</ISBOENOTAPPLICABLE>',
+                '      <ISEXCISEVOUCHER>No</ISEXCISEVOUCHER>',
+                '      <EXCISETAXOVERRIDE>No</EXCISETAXOVERRIDE>',
+                '      <USEFORTAXUNITTRANSFER>No</USEFORTAXUNITTRANSFER>',
+                '      <IGNOREPOSVALIDATION>No</IGNOREPOSVALIDATION>',
+                '      <EXCISEOPENING>No</EXCISEOPENING>',
+                '      <USEFORFINALPRODUCTION>No</USEFORFINALPRODUCTION>',
+                '      <ISTDSOVERRIDDEN>No</ISTDSOVERRIDDEN>',
+                '      <ISTCSOVERRIDDEN>No</ISTCSOVERRIDDEN>',
+                '      <ISTDSTCSCASHVCH>No</ISTDSTCSCASHVCH>',
+                '      <INCLUDEADVPYMTVCH>No</INCLUDEADVPYMTVCH>',
+                '      <ISSUBWORKSCONTRACT>No</ISSUBWORKSCONTRACT>',
+                '      <ISVATOVERRIDDEN>No</ISVATOVERRIDDEN>',
+                '      <IGNOREORIGVCHDATE>No</IGNOREORIGVCHDATE>',
+                '      <ISVATPAIDATCUSTOMS>No</ISVATPAIDATCUSTOMS>',
+                '      <ISDECLAREDTOCUSTOMS>No</ISDECLAREDTOCUSTOMS>',
+                '      <ISSERVICETAXOVERRIDDEN>No</ISSERVICETAXOVERRIDDEN>',
+                '      <ISISDVOUCHER>No</ISISDVOUCHER>',
+                '      <ISEXCISEOVERRIDDEN>No</ISEXCISEOVERRIDDEN>',
+                '      <ISEXCISESUPPLYVCH>No</ISEXCISESUPPLYVCH>',
+                '      <ISGSTOVERRIDDEN>No</ISGSTOVERRIDDEN>',
+                '      <GSTNOTEXPORTED>No</GSTNOTEXPORTED>',
+                '      <IGNOREGSTINVALIDATION>No</IGNOREGSTINVALIDATION>',
+                '      <ISGSTREFUND>No</ISGSTREFUND>',
+                '      <ISGSTSECSEVENAPPLICABLE>No</ISGSTSECSEVENAPPLICABLE>',
+                '      <ISVATPRINCIPALACCOUNT>No</ISVATPRINCIPALACCOUNT>',
+                '      <ISSHIPPINGWITHINSTATE>No</ISSHIPPINGWITHINSTATE>',
+                '      <ISOVERSEASTOURISTTRANS>No</ISOVERSEASTOURISTTRANS>',
+                '      <ISDESIGNATEDZONEPARTY>No</ISDESIGNATEDZONEPARTY>',
+                '      <ISCANCELLED>No</ISCANCELLED>',
+                '      <HASCASHFLOW>Yes</HASCASHFLOW>',
+                '      <ISPOSTDATED>No</ISPOSTDATED>',
+                '      <USETRACKINGNUMBER>No</USETRACKINGNUMBER>',
+                '      <ISINVOICE>No</ISINVOICE>',
+                '      <MFGJOURNAL>No</MFGJOURNAL>',
+                '      <HASDISCOUNTS>No</HASDISCOUNTS>',
+                '      <ASPAYSLIP>No</ASPAYSLIP>',
+                '      <ISCOSTCENTRE>No</ISCOSTCENTRE>',
+                '      <ISSTXNONREALIZEDVCH>No</ISSTXNONREALIZEDVCH>',
+                '      <ISEXCISEMANUFACTURERON>No</ISEXCISEMANUFACTURERON>',
+                '      <ISBLANKCHEQUE>No</ISBLANKCHEQUE>',
+                '      <ISVOID>No</ISVOID>',
+                '      <ORDERLINESTATUS>No</ORDERLINESTATUS>',
+                '      <VATISAGNSTCANCSALES>No</VATISAGNSTCANCSALES>',
+                '      <VATISPURCEXEMPTED>No</VATISPURCEXEMPTED>',
+                '      <ISVATRESTAXINVOICE>No</ISVATRESTAXINVOICE>',
+                '      <VATISASSESABLECALCVCH>No</VATISASSESABLECALCVCH>',
+                '      <ISVATDUTYPAID>Yes</ISVATDUTYPAID>',
+                '      <ISDELIVERYSAMEASCONSIGNEE>No</ISDELIVERYSAMEASCONSIGNEE>',
+                '      <ISDISPATCHSAMEASCONSIGNOR>No</ISDISPATCHSAMEASCONSIGNOR>',
+                '      <CHANGEVCHMODE>No</CHANGEVCHMODE>',
+            ]
+            
+            # Add ALLLEDGERENTRIES for Employee ZSSF
+            xml_lines.extend([
+                '      <ALLLEDGERENTRIES.LIST>',
+                '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                '       </OLDAUDITENTRYIDS.LIST>',
+                '       <LEDGERNAME>ZSSF Employee</LEDGERNAME>',
+                '       <GSTCLASS/>',
+                '       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+                '       <LEDGERFROMITEM>No</LEDGERFROMITEM>',
+                '       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>',
+                '       <ISPARTYLEDGER>No</ISPARTYLEDGER>',
+                '       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>',
+                '       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>',
+                '       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>',
+                f'       <AMOUNT>-{total_employee_zssf:.2f}</AMOUNT>',
+                '       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>',
+                '       <CATEGORYALLOCATIONS.LIST>',
+                '        <CATEGORY>Primary Cost Category</CATEGORY>',
+                '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+            ])
+            
+            # Add cost center allocations for each employee
+            for emp in employee_data:
+                emp_name = emp.get('employee_name', 'Unknown')
+                emp_total_zssf = emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0)
+                if emp_total_zssf > 0:
+                    xml_lines.extend([
+                        '        <COSTCENTREALLOCATIONS.LIST>',
+                        f'         <NAME>{emp_name}</NAME>',
+                        f'         <AMOUNT>-{emp_total_zssf:.2f}</AMOUNT>',
+                        '        </COSTCENTREALLOCATIONS.LIST>',
+                    ])
+            
+            xml_lines.extend([
+                '       </CATEGORYALLOCATIONS.LIST>',
+                '       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>',
+                '       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>',
+                '       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>',
+                '       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>',
+                '       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>',
+                '       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>',
+                '       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>',
+                '       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>',
+                '       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>',
+                '       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>',
+                '       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>',
+                '       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>',
+                '       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>',
+                '       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>',
+                '       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>',
+                '       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>',
+                '       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>',
+                '       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>',
+                '       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>',
+                '       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>',
+                '       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>',
+                '       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>',
+                '      </ALLLEDGERENTRIES.LIST>',
+            ])
+            
+            # Add ALLLEDGERENTRIES for Employer ZSSF
+            xml_lines.extend([
+                '      <ALLLEDGERENTRIES.LIST>',
+                '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                '       </OLDAUDITENTRYIDS.LIST>',
+                '       <LEDGERNAME>ZSSF Employer</LEDGERNAME>',
+                '       <GSTCLASS/>',
+                '       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+                '       <LEDGERFROMITEM>No</LEDGERFROMITEM>',
+                '       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>',
+                '       <ISPARTYLEDGER>No</ISPARTYLEDGER>',
+                '       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>',
+                '       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>',
+                '       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>',
+                f'       <AMOUNT>-{total_employer_zssf:.2f}</AMOUNT>',
+                '       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>',
+                '       <CATEGORYALLOCATIONS.LIST>',
+                '        <CATEGORY>Primary Cost Category</CATEGORY>',
+                '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+            ])
+            
+            # Add cost center allocations for employer portion
+            for emp in employee_data:
+                emp_name = emp.get('employee_name', 'Unknown')
+                emp_total_zssf = emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0)
+                if emp_total_zssf > 0:
+                    xml_lines.extend([
+                        '        <COSTCENTREALLOCATIONS.LIST>',
+                        f'         <NAME>{emp_name}</NAME>',
+                        f'         <AMOUNT>-{emp_total_zssf:.2f}</AMOUNT>',
+                        '        </COSTCENTREALLOCATIONS.LIST>',
+                    ])
+            
+            xml_lines.extend([
+                '       </CATEGORYALLOCATIONS.LIST>',
+                '       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>',
+                '       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>',
+                '       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>',
+                '       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>',
+                '       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>',
+                '       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>',
+                '       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>',
+                '       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>',
+                '       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>',
+                '       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>',
+                '       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>',
+                '       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>',
+                '       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>',
+                '       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>',
+                '       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>',
+                '       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>',
+                '       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>',
+                '       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>',
+                '       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>',
+                '       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>',
+                '       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>',
+                '       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>',
+                '      </ALLLEDGERENTRIES.LIST>',
+            ])
+            
+            # Add Bank/Payment ALLLEDGERENTRIES
+            xml_lines.extend([
+                '      <ALLLEDGERENTRIES.LIST>',
+                '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                '       </OLDAUDITENTRYIDS.LIST>',
+                f'       <LEDGERNAME>{account_name}</LEDGERNAME>',
+                '       <GSTCLASS/>',
+                '       <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>',
+                '       <LEDGERFROMITEM>No</LEDGERFROMITEM>',
+                '       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>',
+                '       <ISPARTYLEDGER>Yes</ISPARTYLEDGER>',
+                '       <ISLASTDEEMEDPOSITIVE>No</ISLASTDEEMEDPOSITIVE>',
+                '       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>',
+                '       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>',
+                f'       <AMOUNT>{total_amount:.2f}</AMOUNT>',
+                '       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>',
+                '       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>',
+                '       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>',
+                '       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>',
+                '       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>',
+                '       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>',
+                '       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>',
+                '       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>',
+                '       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>',
+                '       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>',
+                '       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>',
+                '       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>',
+                '       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>',
+                '       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>',
+                '       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>',
+                '       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>',
+                '       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>',
+                '       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>',
+                '       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>',
+                '       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>',
+                '       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>',
+                '       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>',
+                '       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>',
+                '      </ALLLEDGERENTRIES.LIST>',
+            ])
+            
+            # Close the XML structure
+            xml_lines.extend([
+                '      <PAYROLLMODEOFPAYMENT.LIST>      </PAYROLLMODEOFPAYMENT.LIST>',
+                '      <ATTDRECORDS.LIST>      </ATTDRECORDS.LIST>',
+                '      <GSTEWAYCONSIGNORADDRESS.LIST>      </GSTEWAYCONSIGNORADDRESS.LIST>',
+                '      <GSTEWAYCONSIGNEEADDRESS.LIST>      </GSTEWAYCONSIGNEEADDRESS.LIST>',
+                '      <TEMPGSTRATEDETAILS.LIST>      </TEMPGSTRATEDETAILS.LIST>',
+                '     </VOUCHER>',
+                '    </TALLYMESSAGE>',
+                '   </REQUESTDATA>',
+                '  </IMPORTDATA>',
+                ' </BODY>',
+                '</ENVELOPE>'
+            ])
+            
+            return '\n'.join(xml_lines)
+            
+        except Exception as e:
+            print(f"❌ Error generating ZSSF XML: {str(e)}")
+            return ""
+
     def process_zssf_sheet(self, file_path: str) -> Dict[str, Any]:
         """Process ZSSF sheet (Sheet 3) and extract data."""
         # Read the third sheet (index 2)
@@ -1811,7 +2451,7 @@ class ExcelProcessor:
             employee_data = self.extract_zssf_employee_data(df, employee_start_row)
             
             # Calculate totals
-            total_zssf = sum(emp.get('zssf', 0) for emp in employee_data)
+            total_zssf = sum(emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0) for emp in employee_data)
             
             # Prepare result
             result = {
@@ -1857,7 +2497,7 @@ class ExcelProcessor:
             employee_data = self.extract_zhsf_employee_data(df, employee_start_row)
             
             # Calculate totals
-            total_zhsf = sum(emp.get('zhsf', 0) for emp in employee_data)
+            total_zhsf = sum(emp.get('employee_35', 0) + emp.get('twa_35', 0) for emp in employee_data)
             
             # Prepare result
             result = {
@@ -1897,20 +2537,18 @@ class ExcelProcessor:
                     header_str = str(header).strip().upper()
                     if 'EMPLOYEE' in header_str and 'NAME' in header_str:
                         column_mapping['employee_name'] = idx
-                    elif header_str == 'ZSSF':
-                        column_mapping['zssf'] = idx
-                    elif 'GROSS' in header_str and 'SALARY' in header_str:
-                        column_mapping['gross_salary'] = idx
-                    elif header_str == 'BASIC':
-                        column_mapping['basic'] = idx
-                    elif 'ALLOW' in header_str:
-                        column_mapping['allowance'] = idx
-                    elif 'DEDUCTION' in header_str:
-                        column_mapping['deduction'] = idx
-                    elif 'TIN' in header_str:
-                        column_mapping['tin'] = idx
-                    elif 'ZSSF' in header_str and '#' in header_str:
+                    elif 'ZSSF' in header_str and '7%' in header_str:
+                        column_mapping['zssf_7'] = idx
+                    elif 'ZSSF' in header_str and '14%' in header_str:
+                        column_mapping['zssf_14'] = idx
+                    elif '@' in header_str and '21%' in header_str:
+                        column_mapping['zssf_21'] = idx
+                    elif header_str == 'REMARKS':
+                        column_mapping['remarks'] = idx
+                    elif 'ZSSF' in header_str and 'NO' in header_str:
                         column_mapping['zssf_no'] = idx
+                    elif header_str == 'SALARY':
+                        column_mapping['salary'] = idx
                     elif header_str == 'NAME':
                         column_mapping['name'] = idx
             
@@ -1931,7 +2569,7 @@ class ExcelProcessor:
                     if col_idx < len(row):
                         value = row.iloc[col_idx]
                         if not pd.isna(value):
-                            if field in ['zssf', 'gross_salary', 'basic', 'allowance', 'deduction']:
+                            if field in ['zssf_7', 'zssf_14', 'zssf_21', 'salary']:
                                 # Convert to numeric
                                 try:
                                     employee_record[field] = float(value)
@@ -1942,17 +2580,18 @@ class ExcelProcessor:
                                 str_value = str(value).strip() if value is not None and str(value).strip() != 'nan' else ""
                                 employee_record[field] = str_value
                         else:
-                            employee_record[field] = 0 if field in ['zssf', 'gross_salary', 'basic', 'allowance', 'deduction'] else ""
+                            employee_record[field] = 0 if field in ['zssf_7', 'zssf_14', 'zssf_21', 'salary'] else ""
                 
                 # Ensure employee_name is always a valid string
                 if 'employee_name' in employee_record and not employee_record['employee_name']:
                     employee_record['employee_name'] = f"Employee_{idx}"
                 
                 # Only add if we have essential data
-                if employee_record.get('employee_name') and employee_record.get('zssf', 0) > 0:
+                total_zssf = employee_record.get('zssf_7', 0) + employee_record.get('zssf_14', 0) + employee_record.get('zssf_21', 0)
+                if employee_record.get('employee_name') and total_zssf > 0:
                     employee_data.append(employee_record)
                     emp_name = employee_record.get('employee_name', 'Unknown')
-                    print(f"Added ZSSF employee: {emp_name}, ZSSF: {employee_record.get('zssf', 0)}")
+                    print(f"Added ZSSF employee: {emp_name}, ZSSF 7%: {employee_record.get('zssf_7', 0)}, ZSSF 14%: {employee_record.get('zssf_14', 0)}, ZSSF 21%: {employee_record.get('zssf_21', 0)}")
             
         except Exception as e:
             print(f"❌ Error extracting ZSSF employee data: {str(e)}")
@@ -1974,22 +2613,16 @@ class ExcelProcessor:
                     header_str = str(header).strip().upper()
                     if 'EMPLOYEE' in header_str and 'NAME' in header_str:
                         column_mapping['employee_name'] = idx
-                    elif header_str == 'ZHSF':
-                        column_mapping['zhsf'] = idx
-                    elif 'GROSS' in header_str and 'SALARY' in header_str:
-                        column_mapping['gross_salary'] = idx
-                    elif header_str == 'BASIC':
-                        column_mapping['basic'] = idx
-                    elif 'ALLOW' in header_str:
-                        column_mapping['allowance'] = idx
-                    elif 'DEDUCTION' in header_str:
-                        column_mapping['deduction'] = idx
-                    elif 'TIN' in header_str:
-                        column_mapping['tin'] = idx
-                    elif 'ZSSF' in header_str and '#' in header_str:
-                        column_mapping['zssf_no'] = idx
-                    elif header_str == 'NAME':
-                        column_mapping['name'] = idx
+                    elif 'EMPLOYEE' in header_str and '3.5%' in header_str:
+                        column_mapping['employee_35'] = idx
+                    elif 'TWA' in header_str and '3.5%' in header_str:
+                        column_mapping['twa_35'] = idx
+                    elif header_str == 'SALARY':
+                        column_mapping['salary'] = idx
+                    elif header_str == 'TOTAL':
+                        column_mapping['total'] = idx
+                    elif 'EMPL' in header_str and 'NO' in header_str:
+                        column_mapping['empl_no'] = idx
             
             print(f"🎯 ZHSF Column mapping: {column_mapping}")
             
@@ -2008,7 +2641,7 @@ class ExcelProcessor:
                     if col_idx < len(row):
                         value = row.iloc[col_idx]
                         if not pd.isna(value):
-                            if field in ['zhsf', 'gross_salary', 'basic', 'allowance', 'deduction']:
+                            if field in ['employee_35', 'twa_35', 'salary', 'total']:
                                 # Convert to numeric
                                 try:
                                     employee_record[field] = float(value)
@@ -2019,17 +2652,18 @@ class ExcelProcessor:
                                 str_value = str(value).strip() if value is not None and str(value).strip() != 'nan' else ""
                                 employee_record[field] = str_value
                         else:
-                            employee_record[field] = 0 if field in ['zhsf', 'gross_salary', 'basic', 'allowance', 'deduction'] else ""
+                            employee_record[field] = 0 if field in ['employee_35', 'twa_35', 'salary', 'total'] else ""
                 
                 # Ensure employee_name is always a valid string
                 if 'employee_name' in employee_record and not employee_record['employee_name']:
                     employee_record['employee_name'] = f"Employee_{idx}"
                 
                 # Only add if we have essential data
-                if employee_record.get('employee_name') and employee_record.get('zhsf', 0) > 0:
+                total_zhsf = employee_record.get('employee_35', 0) + employee_record.get('twa_35', 0)
+                if employee_record.get('employee_name') and total_zhsf > 0:
                     employee_data.append(employee_record)
                     emp_name = employee_record.get('employee_name', 'Unknown')
-                    print(f"Added ZHSF employee: {emp_name}, ZHSF: {employee_record.get('zhsf', 0)}")
+                    print(f"Added ZHSF employee: {emp_name}, Employee 3.5%: {employee_record.get('employee_35', 0)}, TWA 3.5%: {employee_record.get('twa_35', 0)}")
             
         except Exception as e:
             print(f"❌ Error extracting ZHSF employee data: {str(e)}")

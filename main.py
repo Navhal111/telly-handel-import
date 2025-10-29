@@ -1052,10 +1052,52 @@ class ModernExcelProcessor:
                     return
                 
                 xml_content = self.processor.generate_paye_xml(result, company_name, account_name, narration)
-            elif upload_type in ["zssf", "zhsf"]:
-                # XML generation is disabled for ZSSF and ZHSF for now - just return silently
-                self.update_status(f"✅ {upload_type.upper()} data processed successfully")
-                return
+            elif upload_type == "zssf":
+                # For ZSSF, ask for account name
+                account_name = self.get_account_name_for_zssf()
+                if not account_name:
+                    return
+                
+                # Ask for narration (optional for ZSSF) - safe string concatenation
+                date_str = result.get("date") or "current period"
+                default_text = f"ZSSF for {date_str}"
+                
+                narration_dialog = NarrationDialog(
+                    self.root, 
+                    title="Enter ZSSF Narration (Optional)",
+                    default_text=default_text,
+                    optional=True
+                )
+                self.root.wait_window(narration_dialog.top)
+                narration = narration_dialog.result
+                
+                if narration is None:  # User cancelled
+                    return
+                
+                xml_content = self.processor.generate_zssf_xml(result, company_name, account_name, narration)
+            elif upload_type == "zhsf":
+                # For ZHSF, ask for account name
+                account_name = self.get_account_name_for_zhsf()
+                if not account_name:
+                    return
+                
+                # Ask for narration (optional for ZHSF) - safe string concatenation
+                date_str = result.get("date") or "current period"
+                default_text = f"ZHSF for {date_str}"
+                
+                narration_dialog = NarrationDialog(
+                    self.root, 
+                    title="Enter ZHSF Narration (Optional)",
+                    default_text=default_text,
+                    optional=True
+                )
+                self.root.wait_window(narration_dialog.top)
+                narration = narration_dialog.result
+                
+                if narration is None:  # User cancelled
+                    return
+                
+                xml_content = self.processor.generate_zhsf_xml(result, company_name, account_name, narration)
             else:
                 messagebox.showerror("Error", f"Unknown upload type: {upload_type}")
                 return
@@ -1154,6 +1196,42 @@ class ModernExcelProcessor:
     def get_account_name_for_paye(self):
         """Get account name for PAYE payment."""
         dialog = PayeAccountSelectionDialog(self.root)
+        self.root.wait_window(dialog.top)
+        return dialog.result
+    
+    def get_account_name_for_zssf(self):
+        """Get account name for ZSSF processing."""
+        dialog = PayeAccountSelectionDialog(self.root)  # Reuse the same dialog
+        dialog.top.title("Select Bank Account for ZSSF")
+        # Update dialog text for ZSSF
+        for child in dialog.top.winfo_children():
+            if hasattr(child, 'winfo_children'):
+                for subchild in child.winfo_children():
+                    if hasattr(subchild, 'configure') and hasattr(subchild, 'cget'):
+                        try:
+                            text = subchild.cget('text')
+                            if 'PAYE' in text:
+                                subchild.configure(text=text.replace('PAYE', 'ZSSF'))
+                        except:
+                            pass
+        self.root.wait_window(dialog.top)
+        return dialog.result
+    
+    def get_account_name_for_zhsf(self):
+        """Get account name for ZHSF processing."""
+        dialog = PayeAccountSelectionDialog(self.root)  # Reuse the same dialog
+        dialog.top.title("Select Bank Account for ZHSF")
+        # Update dialog text for ZHSF
+        for child in dialog.top.winfo_children():
+            if hasattr(child, 'winfo_children'):
+                for subchild in child.winfo_children():
+                    if hasattr(subchild, 'configure') and hasattr(subchild, 'cget'):
+                        try:
+                            text = subchild.cget('text')
+                            if 'PAYE' in text:
+                                subchild.configure(text=text.replace('PAYE', 'ZHSF'))
+                        except:
+                            pass
         self.root.wait_window(dialog.top)
         return dialog.result
     
