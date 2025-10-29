@@ -710,11 +710,29 @@ class ModernExcelProcessor:
         self.create_upload_card(right_frame, "PAYE Upload", "paye", "🏛️", 
                                "Upload PAYE Excel sheet and generate PAYE/SDL payment XML for Tally import")
         
-        # Row 2: Future upload types (placeholder for now)
-        # row2_frame = tk.Frame(content_frame, bg=self.colors['light'])
-        # row2_frame.pack(fill=tk.X, pady=(10, 0))
-        # 
-        # # Future upload cards will go here when you specify them
+        # Row 2: Additional upload types
+        row2_frame = tk.Frame(content_frame, bg=self.colors['light'])
+        row2_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        # Left card - ZSSF
+        zssf_frame = tk.Frame(row2_frame, bg=self.colors['light'])
+        zssf_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        # Right card - ZHSF
+        zhsf_frame = tk.Frame(row2_frame, bg=self.colors['light'])
+        zhsf_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # Empty frame for balance (since we only have 2 cards in this row)
+        empty_frame = tk.Frame(row2_frame, bg=self.colors['light'])
+        empty_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # ZSSF Section
+        self.create_upload_card(zssf_frame, "ZSSF Upload", "zssf", "🏦", 
+                               "Upload Excel sheet 3 for ZSSF processing (XML generation disabled for now)")
+        
+        # ZHSF Section  
+        self.create_upload_card(zhsf_frame, "ZHSF Upload", "zhsf", "🏥", 
+                               "Upload Excel sheet 4 for ZHSF processing (XML generation disabled for now)")
         
         # Status section at bottom
         status_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
@@ -895,8 +913,14 @@ class ModernExcelProcessor:
                 result = self.processor.process_attendance_sheet(file_path)
             elif upload_type == "payroll":
                 result = self.processor.process_payroll_sheet(file_path)
-            else:  # paye
+            elif upload_type == "paye":
                 result = self.processor.process_paye_sheet(file_path)
+            elif upload_type == "zssf":
+                result = self.processor.process_zssf_sheet(file_path)
+            elif upload_type == "zhsf":
+                result = self.processor.process_zhsf_sheet(file_path)
+            else:
+                result = {"error": f"Unknown upload type: {upload_type}", "success": False}
             
             # Update UI in main thread
             self.root.after(0, lambda: self._handle_upload_processing_result(upload_type, result))
@@ -930,6 +954,14 @@ class ModernExcelProcessor:
                 total_amount = result.get("total_amount", 0)
                 self.update_status(f"✅ {upload_type.title()} processed successfully! "
                                  f"{employee_count} employees, PAYE: ₹{total_paye:,.2f}, SDL: ₹{total_sdl:,.2f}, Total: ₹{total_amount:,.2f}")
+            elif upload_type == "zssf":
+                total_zssf = result.get("total_zssf", 0)
+                self.update_status(f"✅ {upload_type.upper()} processed successfully! "
+                                 f"{employee_count} employees, Total ZSSF: ₹{total_zssf:,.2f}")
+            elif upload_type == "zhsf":
+                total_zhsf = result.get("total_zhsf", 0)
+                self.update_status(f"✅ {upload_type.upper()} processed successfully! "
+                                 f"{employee_count} employees, Total ZHSF: ₹{total_zhsf:,.2f}")
             else:
                 self.update_status(f"✅ {upload_type.title()} processed successfully! "
                                  f"{employee_count} employees found")
@@ -955,13 +987,16 @@ class ModernExcelProcessor:
             if "TEST COMPANY" in company_name:
                 company_name = result.get("company_name", "TEST COMPANY")
             
-            # Ask for NARRATION
+            # Ask for NARRATION with safe string concatenation
             if upload_type == "attendance":
                 # For attendance, show popup to ask for narration
+                date_str = result.get("date") or "current period"
+                default_text = f"Attendance for {date_str}"
+                
                 narration_dialog = NarrationDialog(
                     self.root, 
                     title="Enter Attendance Narration",
-                    default_text="Attendance for " + result.get("date", "current period"),
+                    default_text=default_text,
                     optional=False
                 )
                 self.root.wait_window(narration_dialog.top)
@@ -978,10 +1013,13 @@ class ModernExcelProcessor:
                     return
                 
                 # Ask for narration (optional for payroll)
+                date_str = result.get("date") or "current period"
+                default_text = f"Payroll for {date_str}"
+                
                 narration_dialog = NarrationDialog(
                     self.root, 
                     title="Enter Payroll Narration (Optional)",
-                    default_text="Payroll for " + result.get("date", "current period"),
+                    default_text=default_text,
                     optional=True
                 )
                 self.root.wait_window(narration_dialog.top)
@@ -991,17 +1029,20 @@ class ModernExcelProcessor:
                     return
                 
                 xml_content = self.processor.generate_payroll_xml(result, company_name, account_name, narration)
-            else:  # paye
+            elif upload_type == "paye":
                 # For PAYE, ask for account name
                 account_name = self.get_account_name_for_paye()
                 if not account_name:
                     return
                 
-                # Ask for narration (optional for PAYE)
+                # Ask for narration (optional for PAYE) - safe string concatenation
+                date_str = result.get("date") or "current period"
+                default_text = f"PAYE and SDL for {date_str}"
+                
                 narration_dialog = NarrationDialog(
                     self.root, 
                     title="Enter PAYE Narration (Optional)",
-                    default_text="PAYE and SDL for " + result.get("date", "current period"),
+                    default_text=default_text,
                     optional=True
                 )
                 self.root.wait_window(narration_dialog.top)
@@ -1011,6 +1052,13 @@ class ModernExcelProcessor:
                     return
                 
                 xml_content = self.processor.generate_paye_xml(result, company_name, account_name, narration)
+            elif upload_type in ["zssf", "zhsf"]:
+                # XML generation is disabled for ZSSF and ZHSF for now - just return silently
+                self.update_status(f"✅ {upload_type.upper()} data processed successfully")
+                return
+            else:
+                messagebox.showerror("Error", f"Unknown upload type: {upload_type}")
+                return
             
             if xml_content:
                 # Always save XML file first (regardless of Tally server status)
@@ -1020,54 +1068,74 @@ class ModernExcelProcessor:
                     file_type_name = "PAYE" if upload_type == "paye" else upload_type.title()
                     self.update_status(f"✅ {file_type_name} XML file created: {output_path}")
                     
-                    # Show immediate success dialog with XML file info
-                    messagebox.showinfo("XML Generated Successfully", 
-                                      f"{file_type_name} XML file has been generated and saved!\n\n"
-                                      f"File: {output_path}\n\n"
-                                      f"You can import this file directly into Tally or continue with automatic upload.")
+                    # Check if we're in test mode (no Tally server)
+                    is_test_mode = "TEST COMPANY" in self.selected_company
                     
-                    # Now attempt to upload to Tally
-                    self.update_status(f"🚀 Attempting to upload {file_type_name} to Tally server...")
-                    
-                    try:
-                        if upload_type == "attendance":
-                            upload_result = self.api_service.upload_attendance_data(result, company_name)
-                        elif upload_type == "payroll":
-                            upload_result = self.api_service.upload_payroll_data(result, company_name, account_name)
-                        else:  # paye
-                            upload_result = self.api_service.upload_paye_data(result, company_name, account_name)
+                    if is_test_mode:
+                        # Test mode - skip Tally upload, just show XML success
+                        messagebox.showinfo("XML Generated Successfully (Test Mode)", 
+                                          f"{file_type_name} XML file has been generated and saved!\n\n"
+                                          f"📁 File: {output_path}\n\n"
+                                          f"🧪 Test Mode: Tally upload skipped\n"
+                                          f"You can manually import this file into Tally when ready.")
+                        self.update_status(f"✅ {file_type_name} XML generated successfully (Test Mode - No Tally Upload)")
                         
-                        if upload_result and upload_result.get("success"):
-                            self.update_status(f"🎉 {file_type_name} successfully uploaded to Tally server!")
-                            messagebox.showinfo("Upload Successful", 
-                                              f"{file_type_name} data has been successfully uploaded to Tally!\n\n"
-                                              f"✅ XML file saved: {output_path}\n"
-                                              f"✅ Data uploaded to Tally server\n\n"
-                                              f"The voucher should now be available in Tally.")
-                        else:
-                            error_msg = upload_result.get("error", "Unknown upload error") if upload_result else "Upload failed"
-                            self.update_status(f"⚠️ {file_type_name} XML saved, but Tally upload failed: {error_msg}")
-                            
-                            # Show option to open file location
-                            if messagebox.askyesno("Upload Failed - XML Saved", 
-                                                 f"Tally upload failed: {error_msg}\n\n"
-                                                 f"✅ XML file has been saved successfully: {output_path}\n\n"
-                                                 f"You can manually import this file into Tally.\n"
-                                                 f"Would you like to open the file location?"):
-                                import subprocess
-                                subprocess.run(["open", "-R", output_path])  # macOS
-                                
-                    except Exception as upload_error:
-                        self.update_status(f"⚠️ {file_type_name} XML saved, but Tally server error: {str(upload_error)}")
-                        
-                        # Show option to open file location
-                        if messagebox.askyesno("Tally Server Error - XML Saved", 
-                                             f"Could not connect to Tally server: {str(upload_error)}\n\n"
-                                             f"✅ XML file has been saved successfully: {output_path}\n\n"
-                                             f"You can manually import this file into Tally when the server is available.\n"
+                        # Ask if user wants to open file location
+                        if messagebox.askyesno("Open File Location?", 
+                                             f"XML file saved successfully!\n\n"
+                                             f"📁 Location: {output_path}\n\n"
                                              f"Would you like to open the file location?"):
                             import subprocess
                             subprocess.run(["open", "-R", output_path])  # macOS
+                    else:
+                        # Production mode - show success and attempt Tally upload
+                        messagebox.showinfo("XML Generated Successfully", 
+                                          f"{file_type_name} XML file has been generated and saved!\n\n"
+                                          f"File: {output_path}\n\n"
+                                          f"You can import this file directly into Tally or continue with automatic upload.")
+                        
+                        # Now attempt to upload to Tally
+                        self.update_status(f"🚀 Attempting to upload {file_type_name} to Tally server...")
+                        
+                        try:
+                            if upload_type == "attendance":
+                                upload_result = self.api_service.upload_attendance_data(result, company_name)
+                            elif upload_type == "payroll":
+                                upload_result = self.api_service.upload_payroll_data(result, company_name, account_name)
+                            else:  # paye
+                                upload_result = self.api_service.upload_paye_data(result, company_name, account_name)
+                        
+                            if upload_result and upload_result.get("success"):
+                                self.update_status(f"🎉 {file_type_name} successfully uploaded to Tally server!")
+                                messagebox.showinfo("Upload Successful", 
+                                                  f"{file_type_name} data has been successfully uploaded to Tally!\n\n"
+                                                  f"✅ XML file saved: {output_path}\n"
+                                                  f"✅ Data uploaded to Tally server\n\n"
+                                                  f"The voucher should now be available in Tally.")
+                            else:
+                                error_msg = upload_result.get("error", "Unknown upload error") if upload_result else "Upload failed"
+                                self.update_status(f"⚠️ {file_type_name} XML saved, but Tally upload failed: {error_msg}")
+                                
+                                # Show option to open file location
+                                if messagebox.askyesno("Upload Failed - XML Saved", 
+                                                     f"Tally upload failed: {error_msg}\n\n"
+                                                     f"✅ XML file has been saved successfully: {output_path}\n\n"
+                                                     f"You can manually import this file into Tally.\n"
+                                                     f"Would you like to open the file location?"):
+                                    import subprocess
+                                    subprocess.run(["open", "-R", output_path])  # macOS
+                                    
+                        except Exception as upload_error:
+                            self.update_status(f"⚠️ {file_type_name} XML saved, but Tally server error: {str(upload_error)}")
+                            
+                            # Show option to open file location
+                            if messagebox.askyesno("Tally Server Error - XML Saved", 
+                                                 f"Could not connect to Tally server: {str(upload_error)}\n\n"
+                                                 f"✅ XML file has been saved successfully: {output_path}\n\n"
+                                                 f"You can manually import this file into Tally when the server is available.\n"
+                                                 f"Would you like to open the file location?"):
+                                import subprocess
+                                subprocess.run(["open", "-R", output_path])  # macOS
                 else:
                     messagebox.showerror("Error", "Failed to save XML file.")
             else:

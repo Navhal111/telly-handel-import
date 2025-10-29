@@ -1393,14 +1393,21 @@ class ExcelProcessor:
                                 except (ValueError, TypeError):
                                     employee_record[field] = 0
                             else:
-                                employee_record[field] = str(value).strip()
+                                # Ensure string fields are properly converted - safe handling
+                                str_value = str(value).strip() if value is not None and str(value).strip() != 'nan' else ""
+                                employee_record[field] = str_value
                         else:
                             employee_record[field] = 0 if field in ['paye', 'sdl', 'gross_salary', 'basic', 'allowance', 'deduction', 'zssf', 'zhsf'] else ""
+                
+                # Ensure employee_name is always a valid string
+                if 'employee_name' in employee_record and not employee_record['employee_name']:
+                    employee_record['employee_name'] = f"Employee_{idx}"
                 
                 # Only add if we have essential data
                 if employee_record.get('employee_name') and (employee_record.get('paye', 0) > 0 or employee_record.get('sdl', 0) > 0):
                     employee_data.append(employee_record)
-                    print(f"Added PAYE employee: {employee_record.get('employee_name')}, PAYE: {employee_record.get('paye', 0)}, SDL: {employee_record.get('sdl', 0)}")
+                    emp_name = employee_record.get('employee_name', 'Unknown')
+                    print(f"Added PAYE employee: {emp_name}, PAYE: {employee_record.get('paye', 0)}, SDL: {employee_record.get('sdl', 0)}")
             
         except Exception as e:
             print(f"❌ Error extracting PAYE employee data: {str(e)}")
@@ -1417,10 +1424,18 @@ class ExcelProcessor:
             if not employee_data:
                 raise ValueError("No employee data found")
             
-            # Extract header info
+            # Extract header info with safe string handling
             voucher_date = result.get("date", "2025-12-01")
-            comp_name = company_name or result.get("company_name", "")
+            comp_name = company_name or result.get("company_name", "TEST COMPANY")
             narration_text = narration or result.get("narration", "PAYE and SDL for December 2025")
+            
+            # Ensure all string values are not None
+            if comp_name is None or comp_name == "":
+                comp_name = "TEST COMPANY"
+            if narration_text is None or narration_text == "":
+                narration_text = "PAYE and SDL for December 2025"
+            if account_name is None or account_name == "":
+                account_name = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS"
             
             # Format date for Tally (YYYYMMDD)
             if isinstance(voucher_date, str):
@@ -1584,9 +1599,13 @@ class ExcelProcessor:
                 # Add cost center allocations for each employee's PAYE
                 for emp in employee_data:
                     if emp.get('paye', 0) > 0:
+                        # Ensure employee name is always a string
+                        emp_name = emp.get("employee_name") or "Unknown Employee"
+                        if emp_name is None:
+                            emp_name = "Unknown Employee"
                         xml_lines.extend([
                             '        <COSTCENTREALLOCATIONS.LIST>',
-                            f'         <NAME>{emp.get("employee_name", "Unknown")}</NAME>',
+                            f'         <NAME>{emp_name}</NAME>',
                             f'         <AMOUNT>-{emp.get("paye", 0):.2f}</AMOUNT>',
                             '        </COSTCENTREALLOCATIONS.LIST>'
                         ])
@@ -1644,9 +1663,13 @@ class ExcelProcessor:
                 # Add cost center allocations for each employee's SDL
                 for emp in employee_data:
                     if emp.get('sdl', 0) > 0:
+                        # Ensure employee name is always a string
+                        emp_name = emp.get("employee_name") or "Unknown Employee"
+                        if emp_name is None:
+                            emp_name = "Unknown Employee"
                         xml_lines.extend([
                             '        <COSTCENTREALLOCATIONS.LIST>',
-                            f'         <NAME>{emp.get("employee_name", "Unknown")}</NAME>',
+                            f'         <NAME>{emp_name}</NAME>',
                             f'         <AMOUNT>-{emp.get("sdl", 0):.2f}</AMOUNT>',
                             '        </COSTCENTREALLOCATIONS.LIST>'
                         ])
@@ -1766,3 +1789,249 @@ class ExcelProcessor:
         except Exception as e:
             print(f"❌ Error saving XML file: {str(e)}")
             return ""
+
+    def process_zssf_sheet(self, file_path: str) -> Dict[str, Any]:
+        """Process ZSSF sheet (Sheet 3) and extract data."""
+        # Read the third sheet (index 2)
+        df = self.read_excel_file(file_path, sheet_name=2)
+        
+        if df is None:
+            return {"error": "Could not read the Excel file", "success": False}
+        
+        try:
+            print(f"📊 Processing ZSSF sheet: {df.shape[0]} rows × {df.shape[1]} columns")
+            
+            # Extract header information from first few rows
+            header_info = self.extract_header_info(df)
+            
+            # Find where employee data starts - look for row with EMPLOYEE NAME
+            employee_start_row = self.find_employee_data_start(df)
+            
+            # Extract ZSSF employee data
+            employee_data = self.extract_zssf_employee_data(df, employee_start_row)
+            
+            # Calculate totals
+            total_zssf = sum(emp.get('zssf', 0) for emp in employee_data)
+            
+            # Prepare result
+            result = {
+                "file_name": os.path.basename(file_path),
+                "sheet_type": "ZSSF",
+                "success": True,
+                "date": header_info["date"],
+                "company_name": header_info["company_name"],
+                "narration": header_info.get("narration", "ZSSF for current period"),
+                "employee_data": employee_data,
+                "total_employees": len(employee_data),
+                "total_zssf": total_zssf,
+                "total_rows": len(df),
+                "total_columns": len(df.columns),
+                "employee_data_start_row": employee_start_row + 1
+            }
+            
+            print(f"✅ ZSSF processing completed: {len(employee_data)} employees, Total ZSSF: ₹{total_zssf:,.2f}")
+            return result
+            
+        except Exception as e:
+            print(f"❌ Error in ZSSF processing: {str(e)}")
+            return {"error": f"Error processing ZSSF sheet: {str(e)}", "success": False}
+
+    def process_zhsf_sheet(self, file_path: str) -> Dict[str, Any]:
+        """Process ZHSF sheet (Sheet 4) and extract data."""
+        # Read the fourth sheet (index 3)
+        df = self.read_excel_file(file_path, sheet_name=3)
+        
+        if df is None:
+            return {"error": "Could not read the Excel file", "success": False}
+        
+        try:
+            print(f"📊 Processing ZHSF sheet: {df.shape[0]} rows × {df.shape[1]} columns")
+            
+            # Extract header information from first few rows
+            header_info = self.extract_header_info(df)
+            
+            # Find where employee data starts - look for row with EMPLOYEE NAME
+            employee_start_row = self.find_employee_data_start(df)
+            
+            # Extract ZHSF employee data
+            employee_data = self.extract_zhsf_employee_data(df, employee_start_row)
+            
+            # Calculate totals
+            total_zhsf = sum(emp.get('zhsf', 0) for emp in employee_data)
+            
+            # Prepare result
+            result = {
+                "file_name": os.path.basename(file_path),
+                "sheet_type": "ZHSF",
+                "success": True,
+                "date": header_info["date"],
+                "company_name": header_info["company_name"],
+                "narration": header_info.get("narration", "ZHSF for current period"),
+                "employee_data": employee_data,
+                "total_employees": len(employee_data),
+                "total_zhsf": total_zhsf,
+                "total_rows": len(df),
+                "total_columns": len(df.columns),
+                "employee_data_start_row": employee_start_row + 1
+            }
+            
+            print(f"✅ ZHSF processing completed: {len(employee_data)} employees, Total ZHSF: ₹{total_zhsf:,.2f}")
+            return result
+            
+        except Exception as e:
+            print(f"❌ Error in ZHSF processing: {str(e)}")
+            return {"error": f"Error processing ZHSF sheet: {str(e)}", "success": False}
+
+    def extract_zssf_employee_data(self, df: pd.DataFrame, employee_start_row: int) -> List[Dict[str, Any]]:
+        """Extract ZSSF employee data from the DataFrame."""
+        employee_data = []
+        
+        try:
+            # Get header row
+            header_row = df.iloc[employee_start_row]
+            
+            # Create column mapping for ZSSF sheet
+            column_mapping = {}
+            for idx, header in enumerate(header_row):
+                if not pd.isna(header):
+                    header_str = str(header).strip().upper()
+                    if 'EMPLOYEE' in header_str and 'NAME' in header_str:
+                        column_mapping['employee_name'] = idx
+                    elif header_str == 'ZSSF':
+                        column_mapping['zssf'] = idx
+                    elif 'GROSS' in header_str and 'SALARY' in header_str:
+                        column_mapping['gross_salary'] = idx
+                    elif header_str == 'BASIC':
+                        column_mapping['basic'] = idx
+                    elif 'ALLOW' in header_str:
+                        column_mapping['allowance'] = idx
+                    elif 'DEDUCTION' in header_str:
+                        column_mapping['deduction'] = idx
+                    elif 'TIN' in header_str:
+                        column_mapping['tin'] = idx
+                    elif 'ZSSF' in header_str and '#' in header_str:
+                        column_mapping['zssf_no'] = idx
+                    elif header_str == 'NAME':
+                        column_mapping['name'] = idx
+            
+            print(f"🎯 ZSSF Column mapping: {column_mapping}")
+            
+            # Extract data rows
+            data_rows = df.iloc[employee_start_row + 1:]
+            
+            for idx, row in data_rows.iterrows():
+                # Skip empty rows
+                if row.isna().all():
+                    continue
+                
+                employee_record = {}
+                
+                # Extract employee data using column mapping
+                for field, col_idx in column_mapping.items():
+                    if col_idx < len(row):
+                        value = row.iloc[col_idx]
+                        if not pd.isna(value):
+                            if field in ['zssf', 'gross_salary', 'basic', 'allowance', 'deduction']:
+                                # Convert to numeric
+                                try:
+                                    employee_record[field] = float(value)
+                                except (ValueError, TypeError):
+                                    employee_record[field] = 0
+                            else:
+                                # Ensure string fields are properly converted - safe handling
+                                str_value = str(value).strip() if value is not None and str(value).strip() != 'nan' else ""
+                                employee_record[field] = str_value
+                        else:
+                            employee_record[field] = 0 if field in ['zssf', 'gross_salary', 'basic', 'allowance', 'deduction'] else ""
+                
+                # Ensure employee_name is always a valid string
+                if 'employee_name' in employee_record and not employee_record['employee_name']:
+                    employee_record['employee_name'] = f"Employee_{idx}"
+                
+                # Only add if we have essential data
+                if employee_record.get('employee_name') and employee_record.get('zssf', 0) > 0:
+                    employee_data.append(employee_record)
+                    emp_name = employee_record.get('employee_name', 'Unknown')
+                    print(f"Added ZSSF employee: {emp_name}, ZSSF: {employee_record.get('zssf', 0)}")
+            
+        except Exception as e:
+            print(f"❌ Error extracting ZSSF employee data: {str(e)}")
+        
+        return employee_data
+
+    def extract_zhsf_employee_data(self, df: pd.DataFrame, employee_start_row: int) -> List[Dict[str, Any]]:
+        """Extract ZHSF employee data from the DataFrame."""
+        employee_data = []
+        
+        try:
+            # Get header row
+            header_row = df.iloc[employee_start_row]
+            
+            # Create column mapping for ZHSF sheet
+            column_mapping = {}
+            for idx, header in enumerate(header_row):
+                if not pd.isna(header):
+                    header_str = str(header).strip().upper()
+                    if 'EMPLOYEE' in header_str and 'NAME' in header_str:
+                        column_mapping['employee_name'] = idx
+                    elif header_str == 'ZHSF':
+                        column_mapping['zhsf'] = idx
+                    elif 'GROSS' in header_str and 'SALARY' in header_str:
+                        column_mapping['gross_salary'] = idx
+                    elif header_str == 'BASIC':
+                        column_mapping['basic'] = idx
+                    elif 'ALLOW' in header_str:
+                        column_mapping['allowance'] = idx
+                    elif 'DEDUCTION' in header_str:
+                        column_mapping['deduction'] = idx
+                    elif 'TIN' in header_str:
+                        column_mapping['tin'] = idx
+                    elif 'ZSSF' in header_str and '#' in header_str:
+                        column_mapping['zssf_no'] = idx
+                    elif header_str == 'NAME':
+                        column_mapping['name'] = idx
+            
+            print(f"🎯 ZHSF Column mapping: {column_mapping}")
+            
+            # Extract data rows
+            data_rows = df.iloc[employee_start_row + 1:]
+            
+            for idx, row in data_rows.iterrows():
+                # Skip empty rows
+                if row.isna().all():
+                    continue
+                
+                employee_record = {}
+                
+                # Extract employee data using column mapping
+                for field, col_idx in column_mapping.items():
+                    if col_idx < len(row):
+                        value = row.iloc[col_idx]
+                        if not pd.isna(value):
+                            if field in ['zhsf', 'gross_salary', 'basic', 'allowance', 'deduction']:
+                                # Convert to numeric
+                                try:
+                                    employee_record[field] = float(value)
+                                except (ValueError, TypeError):
+                                    employee_record[field] = 0
+                            else:
+                                # Ensure string fields are properly converted - safe handling
+                                str_value = str(value).strip() if value is not None and str(value).strip() != 'nan' else ""
+                                employee_record[field] = str_value
+                        else:
+                            employee_record[field] = 0 if field in ['zhsf', 'gross_salary', 'basic', 'allowance', 'deduction'] else ""
+                
+                # Ensure employee_name is always a valid string
+                if 'employee_name' in employee_record and not employee_record['employee_name']:
+                    employee_record['employee_name'] = f"Employee_{idx}"
+                
+                # Only add if we have essential data
+                if employee_record.get('employee_name') and employee_record.get('zhsf', 0) > 0:
+                    employee_data.append(employee_record)
+                    emp_name = employee_record.get('employee_name', 'Unknown')
+                    print(f"Added ZHSF employee: {emp_name}, ZHSF: {employee_record.get('zhsf', 0)}")
+            
+        except Exception as e:
+            print(f"❌ Error extracting ZHSF employee data: {str(e)}")
+        
+        return employee_data
