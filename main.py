@@ -1127,8 +1127,7 @@ class ModernExcelProcessor:
                                              f"XML file saved successfully!\n\n"
                                              f"📁 Location: {output_path}\n\n"
                                              f"Would you like to open the file location?"):
-                            import subprocess
-                            subprocess.run(["open", "-R", output_path])  # macOS
+                            self.open_file_location(output_path)
                     else:
                         # Production mode - show success and attempt Tally upload
                         messagebox.showinfo("XML Generated Successfully", 
@@ -1164,8 +1163,7 @@ class ModernExcelProcessor:
                                                      f"✅ XML file has been saved successfully: {output_path}\n\n"
                                                      f"You can manually import this file into Tally.\n"
                                                      f"Would you like to open the file location?"):
-                                    import subprocess
-                                    subprocess.run(["open", "-R", output_path])  # macOS
+                                    self.open_file_location(output_path)
                                     
                         except Exception as upload_error:
                             self.update_status(f"⚠️ {file_type_name} XML saved, but Tally server error: {str(upload_error)}")
@@ -1176,8 +1174,7 @@ class ModernExcelProcessor:
                                                  f"✅ XML file has been saved successfully: {output_path}\n\n"
                                                  f"You can manually import this file into Tally when the server is available.\n"
                                                  f"Would you like to open the file location?"):
-                                import subprocess
-                                subprocess.run(["open", "-R", output_path])  # macOS
+                                self.open_file_location(output_path)
                 else:
                     messagebox.showerror("Error", "Failed to save XML file.")
             else:
@@ -1186,6 +1183,26 @@ class ModernExcelProcessor:
         except Exception as e:
             self.update_status(f"❌ Error generating XML: {str(e)}")
             messagebox.showerror("XML Generation Error", f"Failed to generate XML:\n{str(e)}")
+    
+    def open_file_location(self, file_path):
+        """Open file location in system file manager (cross-platform)."""
+        try:
+            import subprocess
+            import platform
+            
+            system = platform.system()
+            if system == "Darwin":  # macOS
+                subprocess.run(["open", "-R", file_path])
+            elif system == "Windows":  # Windows
+                subprocess.run(["explorer", "/select,", file_path])
+            elif system == "Linux":  # Linux
+                subprocess.run(["xdg-open", os.path.dirname(file_path)])
+            else:
+                # Fallback: just open the directory
+                import webbrowser
+                webbrowser.open(os.path.dirname(file_path))
+        except Exception as e:
+            print(f"⚠️ Could not open file location: {str(e)}")
     
     def get_account_name_for_payroll(self):
         """Get account name for payroll payment."""
@@ -1240,12 +1257,38 @@ class ModernExcelProcessor:
         try:
             import shutil
             import os
+            import platform
+            import subprocess
             
-            # Source file path
-            source_file = "/Users/goku/Documents/excel_processor/src/Payroll Voucher/STAFF SALARY 2025-12.xlsx"
+            # Try to find source file from multiple possible locations
+            possible_sources = [
+                # Development path
+                os.path.join(os.path.dirname(__file__), "src", "Payroll Voucher", "STAFF SALARY 2025-12.xlsx"),
+                # Executable bundled path
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "Payroll Voucher", "STAFF SALARY 2025-12.xlsx"),
+                # PyInstaller bundled path
+                os.path.join(getattr(sys, '_MEIPASS', os.path.dirname(__file__)), "src", "Payroll Voucher", "STAFF SALARY 2025-12.xlsx"),
+                # Fallback - current directory
+                "STAFF SALARY 2025-12.xlsx"
+            ]
+            
+            source_file = None
+            for path in possible_sources:
+                if os.path.exists(path):
+                    source_file = path
+                    break
+            
+            if not source_file:
+                # Create a sample payroll file if not found
+                self.create_sample_payroll_file()
+                return
             
             # Destination path (Downloads folder)
             downloads_folder = os.path.expanduser("~/Downloads")
+            if not os.path.exists(downloads_folder):
+                # Fallback to user home directory
+                downloads_folder = os.path.expanduser("~")
+            
             destination_file = os.path.join(downloads_folder, "STAFF SALARY 2025-12.xlsx")
             
             # Copy the file
@@ -1263,12 +1306,261 @@ class ModernExcelProcessor:
             # Update status
             self.update_status(f"📁 Example file downloaded: STAFF SALARY 2025-12.xlsx")
             
-            # Open the file location
-            import subprocess
-            subprocess.run(["open", "-R", destination_file])  # macOS
+            # Open the file location (cross-platform)
+            try:
+                system = platform.system()
+                if system == "Darwin":  # macOS
+                    subprocess.run(["open", "-R", destination_file])
+                elif system == "Windows":  # Windows
+                    subprocess.run(["explorer", "/select,", destination_file])
+                elif system == "Linux":  # Linux
+                    subprocess.run(["xdg-open", os.path.dirname(destination_file)])
+            except Exception:
+                pass  # Ignore if can't open file location
             
         except Exception as e:
             messagebox.showerror("Download Error", f"Error downloading example file: {str(e)}")
+    
+    def create_sample_payroll_file(self):
+        """Create a sample payroll Excel file when the original is not found."""
+        try:
+            from openpyxl import Workbook
+            
+            wb = Workbook()
+            ws = wb.active
+            
+            # Header rows
+            ws['A1'] = "Date"
+            ws['B1'] = "09-10-2025"
+            
+            ws['A2'] = "Company Name"
+            ws['B2'] = "LIGHT"
+            
+            ws['A3'] = "Account"
+            ws['B3'] = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS"
+            
+            ws['A4'] = "Narration"
+            ws['B4'] = "Payroll for October 2025"
+            
+            # Row 6: Payroll headers
+            headers = ['EMPL NO', 'EMPLOYEE NAME', 'BASIC', 'HRA', 'MEDICAL', 'RESPONSIBILITY', 'FUEL', 'ZSSF @ 7%', 'ZHSF @ 3.5%', 'PAYE']
+            for col, header in enumerate(headers, start=1):
+                ws.cell(row=6, column=col, value=header)
+            
+            # Sample employee payroll data
+            employees = [
+                [1, "Ritesh", 2200000, 440000, 660000, 1000000, 250000, 154000, 154000, 823700],
+                [2, "Milan", 4200000, 140000, 98000, 1000000, 0, 67000, 98250, 563100],
+                [3, "John", 1800000, 360000, 540000, 800000, 200000, 126000, 126000, 690000],
+                [4, "Sarah", 3500000, 120000, 85000, 900000, 0, 58000, 85500, 485000],
+                [5, "Mike", 2800000, 560000, 420000, 1200000, 300000, 196000, 196000, 1050000]
+            ]
+            
+            # Add employee data starting from row 7
+            for row_idx, emp in enumerate(employees, start=7):
+                for col_idx, value in enumerate(emp, start=1):
+                    ws.cell(row=row_idx, column=col_idx, value=value)
+            
+            # Save to Downloads folder
+            downloads_folder = os.path.expanduser("~/Downloads")
+            if not os.path.exists(downloads_folder):
+                downloads_folder = os.path.expanduser("~")
+            
+            destination_file = os.path.join(downloads_folder, "STAFF SALARY 2025-12.xlsx")
+            wb.save(destination_file)
+            
+            # Show success message
+            messagebox.showinfo(
+                "Sample Created", 
+                f"Sample payroll file created successfully!\n\n"
+                f"File: STAFF SALARY 2025-12.xlsx\n"
+                f"Location: {destination_file}\n\n"
+                f"This sample shows the expected format for payroll processing."
+            )
+            
+            self.update_status(f"📁 Sample payroll file created: STAFF SALARY 2025-12.xlsx")
+            
+        except Exception as e:
+            messagebox.showerror("Create Sample Error", f"Error creating sample file: {str(e)}")
+    
+    def download_sample(self, section_type):
+        """Download sample Excel file for the specified section type."""
+        try:
+            from openpyxl import Workbook
+            
+            wb = Workbook()
+            ws = wb.active
+            
+            if section_type == "attendance":
+                # Create attendance sample
+                ws['A1'] = "Date"
+                ws['B1'] = "09-10-2025"
+                
+                ws['A2'] = "Company Name"
+                ws['B2'] = "LIGHT"
+                
+                ws['A3'] = "Narration"
+                ws['B3'] = "Sample attendance data"
+                
+                # Headers at row 5
+                ws['A5'] = "EMPL NO"
+                ws['B5'] = "EMPLOYEE NAME"
+                ws['C5'] = "Attendance/Production Types"
+                ws['D5'] = "Attendance Days"
+                
+                # Sample attendance data
+                employees = [
+                    [1, "Ritesh", "Present", 23],
+                    [2, "Milan", "Absent", 2],
+                    [3, "Anil", "Overtime @ 1.25", 23],
+                    [4, "John", "Present", 22],
+                    [5, "Sarah", "Overtime @ 1.5", 25],
+                    [6, "Mike", "Present", 23]
+                ]
+                
+                for i, emp in enumerate(employees, start=6):
+                    ws[f'A{i}'] = emp[0]
+                    ws[f'B{i}'] = emp[1]
+                    ws[f'C{i}'] = emp[2]
+                    ws[f'D{i}'] = emp[3]
+                
+                filename = "Sample_Attendance.xlsx"
+                
+            elif section_type == "payroll":
+                # Create payroll sample
+                ws['A1'] = "Date"
+                ws['B1'] = "09-10-2025"
+                
+                ws['A2'] = "Company Name"
+                ws['B2'] = "LIGHT"
+                
+                ws['A3'] = "Account"
+                ws['B3'] = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS"
+                
+                ws['A4'] = "Narration"
+                ws['B4'] = "Sample payroll data"
+                
+                # Headers at row 6
+                headers = ['EMPL NO', 'EMPLOYEE NAME', 'BASIC', 'HRA', 'MEDICAL', 'RESPONSIBILITY', 'FUEL', 'ZSSF @ 7%', 'ZHSF @ 3.5%', 'PAYE']
+                for col, header in enumerate(headers, start=1):
+                    ws.cell(row=6, column=col, value=header)
+                
+                # Sample payroll data
+                employees = [
+                    [1, "Ritesh", 2200000, 440000, 660000, 1000000, 250000, 154000, 154000, 823700],
+                    [2, "Milan", 4200000, 140000, 98000, 1000000, 0, 67000, 98250, 563100],
+                    [3, "John", 1800000, 360000, 540000, 800000, 200000, 126000, 126000, 690000],
+                    [4, "Sarah", 3500000, 120000, 85000, 900000, 0, 58000, 85500, 485000],
+                    [5, "Mike", 2800000, 560000, 420000, 1200000, 300000, 196000, 196000, 1050000]
+                ]
+                
+                for row_idx, emp in enumerate(employees, start=7):
+                    for col_idx, value in enumerate(emp, start=1):
+                        ws.cell(row=row_idx, column=col_idx, value=value)
+                
+                filename = "Sample_Payroll.xlsx"
+                
+            elif section_type == "zssf":
+                # Create ZSSF sample (Sheet 3 structure)
+                ws['A1'] = "Date"
+                ws['B1'] = "30-12-2025"
+                
+                ws['A2'] = "Company Name"
+                ws['B2'] = "LIGHT"
+                
+                ws['A3'] = "Narration"
+                ws['B3'] = "ZSSF contributions December 2025"
+                
+                # Headers at row 5
+                headers = ['EMPL NO', 'EMPLOYEE NAME', 'ZSSF @ 7%', 'ZSSF @ 14%', 'ZSSF @ 21%']
+                for col, header in enumerate(headers, start=1):
+                    ws.cell(row=5, column=col, value=header)
+                
+                # Sample ZSSF data
+                employees = [
+                    [1, "Ritesh", 154000, 308000, 0],
+                    [2, "Milan", 294000, 588000, 0],
+                    [3, "John", 126000, 252000, 0],
+                    [4, "Sarah", 245000, 490000, 0],
+                    [5, "Mike", 196000, 392000, 0]
+                ]
+                
+                for row_idx, emp in enumerate(employees, start=6):
+                    for col_idx, value in enumerate(emp, start=1):
+                        ws.cell(row=row_idx, column=col_idx, value=value)
+                
+                filename = "Sample_ZSSF.xlsx"
+                
+            elif section_type == "zhsf":
+                # Create ZHSF sample (Sheet 4 structure)
+                ws['A1'] = "Date"
+                ws['B1'] = "30-12-2025"
+                
+                ws['A2'] = "Company Name"
+                ws['B2'] = "LIGHT"
+                
+                ws['A3'] = "Narration"
+                ws['B3'] = "ZHSF contributions December 2025"
+                
+                # Headers at row 5
+                headers = ['EMPL NO', 'EMPLOYEE NAME', 'Employee 3.5%', 'TWA 3.5%']
+                for col, header in enumerate(headers, start=1):
+                    ws.cell(row=5, column=col, value=header)
+                
+                # Sample ZHSF data
+                employees = [
+                    [1, "Ritesh", 77000, 77000],
+                    [2, "Milan", 147000, 147000],
+                    [3, "John", 63000, 63000],
+                    [4, "Sarah", 122500, 122500],
+                    [5, "Mike", 98000, 98000]
+                ]
+                
+                for row_idx, emp in enumerate(employees, start=6):
+                    for col_idx, value in enumerate(emp, start=1):
+                        ws.cell(row=row_idx, column=col_idx, value=value)
+                
+                filename = "Sample_ZHSF.xlsx"
+                
+            else:
+                messagebox.showerror("Error", f"Unknown section type: {section_type}")
+                return
+            
+            # Save to Downloads folder
+            downloads_folder = os.path.expanduser("~/Downloads")
+            if not os.path.exists(downloads_folder):
+                downloads_folder = os.path.expanduser("~")
+            
+            destination_file = os.path.join(downloads_folder, filename)
+            wb.save(destination_file)
+            
+            # Show success message
+            messagebox.showinfo(
+                "Sample Downloaded", 
+                f"Sample {section_type} file created successfully!\n\n"
+                f"File: {filename}\n"
+                f"Location: {destination_file}\n\n"
+                f"Use this file as a template for your {section_type} data."
+            )
+            
+            self.update_status(f"📁 Sample {section_type} file created: {filename}")
+            
+            # Try to open file location
+            try:
+                import platform
+                import subprocess
+                system = platform.system()
+                if system == "Darwin":  # macOS
+                    subprocess.run(["open", "-R", destination_file])
+                elif system == "Windows":  # Windows
+                    subprocess.run(["explorer", "/select,", destination_file])
+                elif system == "Linux":  # Linux
+                    subprocess.run(["xdg-open", os.path.dirname(destination_file)])
+            except Exception:
+                pass  # Ignore if can't open file location
+                
+        except Exception as e:
+            messagebox.showerror("Download Error", f"Error creating sample file: {str(e)}")
     
     def update_status(self, message):
         """Update the status display."""

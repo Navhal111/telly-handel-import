@@ -1770,24 +1770,75 @@ class ExcelProcessor:
             
             if output_path is None:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
                 # Create appropriate filename based on file type
                 if file_type == "paye":
-                    output_path = f"payroll_paye_import_{timestamp}.xml"
+                    filename = f"payroll_paye_import_{timestamp}.xml"
                 elif file_type == "payroll":
-                    output_path = f"payroll_tally_import_{timestamp}.xml"
+                    filename = f"payroll_tally_import_{timestamp}.xml"
                 elif file_type == "attendance":
-                    output_path = f"attendance_tally_import_{timestamp}.xml"
+                    filename = f"attendance_tally_import_{timestamp}.xml"
+                elif file_type == "zssf":
+                    filename = f"zssf_tally_import_{timestamp}.xml"
+                elif file_type == "zhsf":
+                    filename = f"zhsf_tally_import_{timestamp}.xml"
                 else:
-                    output_path = f"{file_type}_tally_import_{timestamp}.xml"
-            
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(xml_content)
+                    filename = f"{file_type}_tally_import_{timestamp}.xml"
+                
+                # Try to save to user's Documents folder first, fallback to Downloads, then temp
+                possible_locations = [
+                    # User Documents folder
+                    os.path.join(os.path.expanduser("~"), "Documents", "Tally_XML_Files"),
+                    # User Downloads folder
+                    os.path.join(os.path.expanduser("~"), "Downloads"),
+                    # User home directory
+                    os.path.expanduser("~"),
+                    # Current directory (if writable)
+                    os.getcwd(),
+                    # Temporary directory as last resort
+                    os.path.join(os.path.expanduser("~"), "temp"),
+                ]
+                
+                output_path = None
+                for location in possible_locations:
+                    try:
+                        # Create directory if it doesn't exist (for Documents/Tally_XML_Files)
+                        if not os.path.exists(location):
+                            os.makedirs(location, exist_ok=True)
+                        
+                        # Test if we can write to this location
+                        test_path = os.path.join(location, filename)
+                        
+                        # Try to write the file
+                        with open(test_path, 'w', encoding='utf-8') as f:
+                            f.write(xml_content)
+                        
+                        output_path = test_path
+                        break
+                        
+                    except (OSError, PermissionError, IOError) as e:
+                        print(f"⚠️ Cannot write to {location}: {str(e)}")
+                        continue
+                
+                if not output_path:
+                    raise ValueError("Could not find a writable location to save XML file")
+            else:
+                # Output path was provided, use it directly
+                # But ensure the directory exists
+                directory = os.path.dirname(output_path)
+                if directory and not os.path.exists(directory):
+                    os.makedirs(directory, exist_ok=True)
+                
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(xml_content)
             
             print(f"✅ XML file saved: {output_path}")
             return output_path
             
         except Exception as e:
             print(f"❌ Error saving XML file: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return ""
 
     def generate_zhsf_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None) -> str:
