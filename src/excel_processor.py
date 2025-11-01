@@ -707,7 +707,7 @@ class ExcelProcessor:
             print(f"Error getting sheet names: {str(e)}")
             return []
     
-    def generate_payroll_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "Cash", narration: str = None) -> str:
+    def generate_payroll_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "Cash", narration: str = None, voucher_date: str = None) -> str:
         """Generate Tally XML for payroll voucher from processed payroll data - Proper Payroll Voucher Format."""
         try:
             if not result.get("success", False):
@@ -717,8 +717,8 @@ class ExcelProcessor:
             if not employee_data:
                 raise ValueError("No employee data found")
             
-            # Extract header info
-            voucher_date = result.get("date", "2025-12-01")
+            # Extract header info - use provided voucher_date if available, otherwise fallback to result date
+            voucher_date = voucher_date or result.get("date", "2025-12-01")
             comp_name = company_name or result.get("company_name", "")
             narration_text = narration or result.get("narration", "Payroll for December 2025")
             
@@ -990,7 +990,7 @@ class ExcelProcessor:
             print(f"❌ Error generating payroll XML: {str(e)}")
             return ""
     
-    def generate_attendance_xml(self, result: Dict[str, Any], company_name: str = None, narration: str = None) -> str:
+    def generate_attendance_xml(self, result: Dict[str, Any], company_name: str = None, narration: str = None, voucher_date: str = None) -> str:
         """Generate Tally XML for attendance voucher from processed attendance data - Proper Attendance Voucher Format."""
         try:
             if not result.get("success", False):
@@ -1000,8 +1000,8 @@ class ExcelProcessor:
             if not employee_data:
                 raise ValueError("No employee data found")
             
-            # Extract header info
-            voucher_date = result.get("date", "2025-12-01")
+            # Extract header info - use provided voucher_date if available, otherwise fallback to result date
+            voucher_date = voucher_date or result.get("date", "2025-12-01")
             comp_name = company_name or result.get("company_name", "")
             narration_text = narration or result.get("narration", "Attendance for December 2025")
             
@@ -1414,7 +1414,7 @@ class ExcelProcessor:
         
         return employee_data
 
-    def generate_paye_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None) -> str:
+    def generate_paye_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None, voucher_date: str = None) -> str:
         """Generate Tally XML for PAYE voucher from processed PAYE data - Payment Voucher Format."""
         try:
             if not result.get("success", False):
@@ -1424,8 +1424,8 @@ class ExcelProcessor:
             if not employee_data:
                 raise ValueError("No employee data found")
             
-            # Extract header info with safe string handling
-            voucher_date = result.get("date", "2025-12-01")
+            # Extract header info with safe string handling - use provided voucher_date if available
+            voucher_date = voucher_date or result.get("date", "2025-12-01")
             comp_name = company_name or result.get("company_name", "TEST COMPANY")
             narration_text = narration or result.get("narration", "PAYE and SDL for December 2025")
             
@@ -1841,7 +1841,7 @@ class ExcelProcessor:
             traceback.print_exc()
             return ""
 
-    def generate_zhsf_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None) -> str:
+    def generate_zhsf_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None, voucher_date: str = None) -> str:
         """Generate Tally XML for ZHSF voucher from processed ZHSF data - Payment Voucher Format."""
         try:
             if not result.get("success", False):
@@ -1851,8 +1851,8 @@ class ExcelProcessor:
             if not employee_data:
                 raise ValueError("No employee data found")
             
-            # Extract header info with safe string handling
-            voucher_date = result.get("date", "2025-12-01")
+            # Extract header info with safe string handling - use provided voucher_date if available
+            voucher_date = voucher_date or result.get("date", "2025-12-01")
             comp_name = company_name or result.get("company_name", "TEST COMPANY")
             narration_text = narration or result.get("narration", "ZHSF for December 2025")
             
@@ -2150,7 +2150,7 @@ class ExcelProcessor:
             print(f"❌ Error generating ZHSF XML: {str(e)}")
             return ""
 
-    def generate_zssf_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None) -> str:
+    def generate_zssf_xml(self, result: Dict[str, Any], company_name: str = None, account_name: str = "THE PEOLPE'S BANK OF ZANZIBAR LIMITED - TZS", narration: str = None, voucher_date: str = None) -> str:
         """Generate Tally XML for ZSSF voucher from processed ZSSF data - Payment Voucher Format."""
         try:
             if not result.get("success", False):
@@ -2160,8 +2160,8 @@ class ExcelProcessor:
             if not employee_data:
                 raise ValueError("No employee data found")
             
-            # Extract header info with safe string handling
-            voucher_date = result.get("date", "2025-12-01")
+            # Extract header info with safe string handling - use provided voucher_date if available
+            voucher_date = voucher_date or result.get("date", "2025-12-01")
             comp_name = company_name or result.get("company_name", "TEST COMPANY")
             narration_text = narration or result.get("narration", "ZSSF for December 2025")
             

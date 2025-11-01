@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
+from datetime import datetime, timedelta
+from tkcalendar import DateEntry
 import json
 import sys
 import os
@@ -279,6 +281,7 @@ class ModernExcelProcessor:
         self.processor = ExcelProcessor()
         self.api_service = TallyApiService()
         self.selected_company = None
+        self.selected_date = datetime.now().strftime("%Y-%m-%d")  # Default to today's date
         
         # Show company selection screen first
         self.show_company_selection_screen()
@@ -308,26 +311,26 @@ class ModernExcelProcessor:
         # Configure ttk styles
         style.theme_use('clam')
         
-        # Enhanced button styles with optimized padding
+        # Compact button styles - SMALLER padding
         style.configure('Primary.TButton',
                        background=self.colors['primary'],
                        foreground=self.colors['white'],
-                       font=('Arial', 11, 'bold'),
-                       padding=(20, 12),
+                       font=('Arial', 9, 'bold'),
+                       padding=(10, 6),
                        borderwidth=0)
         
         style.configure('Secondary.TButton',
                        background=self.colors['secondary'],
                        foreground=self.colors['white'],
-                       font=('Arial', 11, 'bold'),
-                       padding=(20, 12),
+                       font=('Arial', 9, 'bold'),
+                       padding=(10, 6),
                        borderwidth=0)
         
         style.configure('Success.TButton',
                        background=self.colors['success'],
                        foreground=self.colors['white'],
-                       font=('Arial', 11, 'bold'),
-                       padding=(20, 12),
+                       font=('Arial', 9, 'bold'),
+                       padding=(10, 6),
                        borderwidth=0)
         
         # Button hover effects
@@ -453,6 +456,8 @@ class ModernExcelProcessor:
         )
         self.company_dropdown.pack(pady=8, padx=8, fill=tk.X)
         
+
+        
         # Buttons frame with centered layout
         button_frame = tk.Frame(selection_frame, bg=self.colors['white'])
         button_frame.pack(fill=tk.X, pady=(20, 0))
@@ -562,6 +567,8 @@ class ModernExcelProcessor:
                 fg=self.colors['danger']
             )
     
+
+    
     def on_company_selected(self, event=None):
         """Handle company selection."""
         selected = self.company_var.get()
@@ -608,6 +615,8 @@ class ModernExcelProcessor:
         # Create main upload screen
         self.create_main_upload_screen()
     
+
+    
     def create_main_upload_screen(self):
         """Create the main upload screen with attendance and payroll options."""
         # Main container (more compact)
@@ -618,32 +627,104 @@ class ModernExcelProcessor:
         header_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
         header_frame.pack(fill=tk.X, pady=(0, 20))
         
-        # Company info banner
+        # Company info banner with main title on left
         is_test_mode = "TEST COMPANY" in self.selected_company
         banner_color = self.colors['warning'] if is_test_mode else self.colors['primary']
         banner_icon = "🧪" if is_test_mode else "🏢"
-        banner_text = f"{banner_icon} {'Test Mode - ' if is_test_mode else 'Connected to: '}{self.selected_company}"
         
         company_banner = tk.Frame(header_frame, bg=banner_color, relief=tk.RAISED, bd=1)
-        company_banner.pack(fill=tk.X, pady=(0, 20))
+        company_banner.pack(fill=tk.X, pady=(0, 15))
         
-        company_info = tk.Label(
-            company_banner,
-            text=banner_text,
+        # Banner content container
+        banner_content = tk.Frame(company_banner, bg=banner_color)
+        banner_content.pack(fill=tk.X, pady=10)
+        
+        # Left side - Main Title
+        left_side = tk.Frame(banner_content, bg=banner_color)
+        left_side.pack(side=tk.LEFT, padx=(20, 0))
+        
+        main_title = tk.Label(
+            left_side,
+            text="📊 Excel File Processor & XML Generator",
             font=('Arial', 14, 'bold'),
             bg=banner_color,
-            fg=self.colors['white'],
-            pady=15
+            fg=self.colors['white']
+        )
+        main_title.pack(anchor=tk.W)
+        
+        subtitle = tk.Label(
+            left_side,
+            text="Upload Excel files and generate Tally-compatible XML for import",
+            font=('Arial', 9),
+            bg=banner_color,
+            fg=self.colors['white']
+        )
+        subtitle.pack(anchor=tk.W)
+        
+        # Right side - Company info
+        right_side = tk.Frame(banner_content, bg=banner_color)
+        right_side.pack(side=tk.RIGHT, padx=(0, 20))
+        
+        company_info = tk.Label(
+            right_side,
+            text=f"{banner_icon} {'Test Mode - ' if is_test_mode else ''}{self.selected_company}",
+            font=('Arial', 12, 'bold'),
+            bg=banner_color,
+            fg=self.colors['white']
         )
         company_info.pack()
         
-        # Title section with Download Example button
-        title_section = tk.Frame(header_frame, bg=self.colors['light'])
-        title_section.pack(fill=tk.X, pady=(0, 10))
+        # Date Picker section - LEFT side below company banner
+        date_and_download_section = tk.Frame(header_frame, bg=self.colors['light'])
+        date_and_download_section.pack(fill=tk.X, pady=(0, 15))
         
-        # Left side - Download Example button
-        download_frame = tk.Frame(title_section, bg=self.colors['light'])
-        download_frame.pack(side=tk.LEFT)
+        # Left side - Date Picker
+        date_frame = tk.Frame(date_and_download_section, bg=self.colors['light'])
+        date_frame.pack(side=tk.LEFT, padx=(0, 20))
+        
+        # Date picker container with border
+        date_container = tk.Frame(date_frame, bg=self.colors['white'], relief=tk.RIDGE, bd=2)
+        date_container.pack(ipady=10, ipadx=15)
+        
+        # Date label
+        date_label = tk.Label(
+            date_container, 
+            text="📅 Select Voucher Date:", 
+            font=('Arial', 12, 'bold'),
+            bg=self.colors['white'],
+            fg=self.colors['primary']
+        )
+        date_label.pack(side=tk.LEFT, padx=(10, 10))
+        
+        # Professional Calendar Date Picker
+        self.date_picker = DateEntry(
+            date_container,
+            width=15,
+            background='darkblue',
+            foreground='white',
+            headersbackground='darkblue',
+            headersforeground='white',
+            selectbackground='#3498db',
+            selectforeground='white',
+            normalbackground='white',
+            normalforeground='black',
+            weekendbackground='lightgray',
+            weekendforeground='black',
+            othermonthforeground='gray',
+            othermonthbackground='white',
+            borderwidth=2,
+            font=('Arial', 11, 'bold'),
+            date_pattern='yyyy-mm-dd',
+            state='readonly',
+            year=datetime.now().year,
+            month=datetime.now().month,
+            day=datetime.now().day
+        )
+        self.date_picker.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Right side - Download Example button
+        download_frame = tk.Frame(date_and_download_section, bg=self.colors['light'])
+        download_frame.pack(side=tk.RIGHT)
         
         download_btn = ttk.Button(
             download_frame,
@@ -651,31 +732,7 @@ class ModernExcelProcessor:
             command=self.download_example_file,
             style='Primary.TButton'
         )
-        download_btn.pack(pady=5)
-        
-        # Center - Title
-        title_center = tk.Frame(title_section, bg=self.colors['light'])
-        title_center.pack(expand=True)
-        
-        # Main title (smaller)
-        title_label = tk.Label(
-            title_center,
-            text="📊 Excel File Processor & XML Generator",
-            font=('Arial', 20, 'bold'),
-            bg=self.colors['light'],
-            fg=self.colors['primary']
-        )
-        title_label.pack()
-        
-        # Subtitle (smaller)
-        subtitle_label = tk.Label(
-            title_center,
-            text="Upload Excel files and generate Tally-compatible XML for import",
-            font=('Arial', 12),
-            bg=self.colors['light'],
-            fg=self.colors['dark']
-        )
-        subtitle_label.pack()
+        download_btn.pack()
         
         # Content container - Grid layout for multiple upload boxes
         content_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
@@ -728,11 +785,11 @@ class ModernExcelProcessor:
         
         # ZSSF Section
         self.create_upload_card(zssf_frame, "ZSSF Upload", "zssf", "🏦", 
-                               "Upload Excel sheet 3 for ZSSF processing (XML generation disabled for now)")
+                               "Upload ZSSF Excel sheet and generate XML for Tally import")
         
         # ZHSF Section  
         self.create_upload_card(zhsf_frame, "ZHSF Upload", "zhsf", "🏥", 
-                               "Upload Excel sheet 4 for ZHSF processing (XML generation disabled for now)")
+                               "Upload ZHSF Excel sheet and generate XML for Tally import")
         
         # Status section at bottom
         status_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
@@ -766,43 +823,43 @@ class ModernExcelProcessor:
     
     def create_upload_card(self, parent, title, upload_type, icon, description):
         """Create a compact card for file upload functionality."""
-        # Main card container (smaller)
+        # Main card container - VERY COMPACT
         card_frame = tk.Frame(parent, bg=self.colors['white'], relief=tk.RAISED, bd=1)
-        card_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        card_frame.pack(fill=tk.BOTH, expand=True, padx=3, pady=3)
         
-        # Card header (smaller)
+        # Card header - COMPACT
         header = tk.Frame(card_frame, bg=self.colors['primary'])
         header.pack(fill=tk.X)
         
         header_label = tk.Label(
             header,
             text=f"{icon} {title}",
-            font=('Arial', 14, 'bold'),
+            font=('Arial', 11, 'bold'),
             bg=self.colors['primary'],
             fg=self.colors['white'],
-            pady=8
+            pady=5
         )
         header_label.pack()
         
-        # Card content (more compact)
-        content = tk.Frame(card_frame, bg=self.colors['white'], padx=15, pady=15)
+        # Card content - MINIMAL padding
+        content = tk.Frame(card_frame, bg=self.colors['white'], padx=8, pady=8)
         content.pack(fill=tk.BOTH, expand=True)
         
-        # Description (smaller)
+        # Description - SMALLER
         desc_label = tk.Label(
             content,
             text=description,
-            font=('Arial', 10),
+            font=('Arial', 8),
             bg=self.colors['white'],
             fg=self.colors['dark'],
-            wraplength=250,
+            wraplength=220,
             justify=tk.LEFT
         )
-        desc_label.pack(pady=(0, 15))
+        desc_label.pack(pady=(0, 8))
         
-        # File selection area (compact)
+        # File selection area - COMPACT
         file_frame = tk.Frame(content, bg=self.colors['light'], relief=tk.SUNKEN, bd=1)
-        file_frame.pack(fill=tk.X, pady=(0, 15))
+        file_frame.pack(fill=tk.X, pady=(0, 8))
         
         # File path variable
         file_path_var = tk.StringVar(value="No file selected")
@@ -811,38 +868,38 @@ class ModernExcelProcessor:
         
         file_label = tk.Label(
             file_frame,
-            text="📁 Selected File:",
-            font=('Arial', 9, 'bold'),
+            text="📁 File:",
+            font=('Arial', 8, 'bold'),
             bg=self.colors['light'],
             fg=self.colors['dark']
         )
-        file_label.pack(anchor=tk.W, padx=8, pady=(8, 3))
+        file_label.pack(anchor=tk.W, padx=5, pady=(5, 2))
         
         file_display = tk.Label(
             file_frame,
             textvariable=file_path_var,
-            font=('Arial', 9),
+            font=('Arial', 8),
             bg=self.colors['light'],
             fg=self.colors['dark'],
-            wraplength=220,
+            wraplength=200,
             justify=tk.LEFT
         )
-        file_display.pack(anchor=tk.W, padx=8, pady=(0, 8))
+        file_display.pack(anchor=tk.W, padx=5, pady=(0, 5))
         
-        # Buttons
+        # Buttons - SMALLER
         btn_frame = tk.Frame(content, bg=self.colors['white'])
         btn_frame.pack(fill=tk.X)
         
-        # Browse button
+        # Browse button - COMPACT
         browse_btn = ttk.Button(
             btn_frame,
-            text="📂 Browse File",
+            text="📂 Browse",
             command=lambda: self.browse_upload_file(upload_type),
             style='Primary.TButton'
         )
-        browse_btn.pack(fill=tk.X, pady=(0, 8))
+        browse_btn.pack(fill=tk.X, pady=(0, 5))
         
-        # Process button
+        # Process button - COMPACT
         process_btn = ttk.Button(
             btn_frame,
             text=f"⚙️ Process",
@@ -850,18 +907,18 @@ class ModernExcelProcessor:
             style='Secondary.TButton',
             state='disabled'
         )
-        process_btn.pack(fill=tk.X, pady=(0, 8))
+        process_btn.pack(fill=tk.X, pady=(0, 4))
         setattr(self, f"{upload_type}_process_btn", process_btn)
         
-        # Generate and upload to telly button
+        # Generate XML button - COMPACT
         xml_btn = ttk.Button(
             btn_frame,
-            text="� Generate and upload to telly",
+            text="📤 Generate XML",
             command=lambda: self.generate_xml_file(upload_type),
             style='Success.TButton',
             state='disabled'
         )
-        xml_btn.pack(fill=tk.X, pady=(0, 5))
+        xml_btn.pack(fill=tk.X, pady=(0, 3))
         setattr(self, f"{upload_type}_xml_btn", xml_btn)
     
     def browse_upload_file(self, upload_type):
@@ -1005,7 +1062,7 @@ class ModernExcelProcessor:
                 if narration is None:  # User cancelled
                     return
                 
-                xml_content = self.processor.generate_attendance_xml(result, company_name, narration)
+                xml_content = self.processor.generate_attendance_xml(result, company_name, narration, self.selected_date)
             elif upload_type == "payroll":
                 # For payroll, ask for account name
                 account_name = self.get_account_name_for_payroll()
@@ -1028,7 +1085,7 @@ class ModernExcelProcessor:
                 if narration is None:  # User cancelled
                     return
                 
-                xml_content = self.processor.generate_payroll_xml(result, company_name, account_name, narration)
+                xml_content = self.processor.generate_payroll_xml(result, company_name, account_name, narration, self.selected_date)
             elif upload_type == "paye":
                 # For PAYE, ask for account name
                 account_name = self.get_account_name_for_paye()
@@ -1051,7 +1108,7 @@ class ModernExcelProcessor:
                 if narration is None:  # User cancelled
                     return
                 
-                xml_content = self.processor.generate_paye_xml(result, company_name, account_name, narration)
+                xml_content = self.processor.generate_paye_xml(result, company_name, account_name, narration, self.selected_date)
             elif upload_type == "zssf":
                 # For ZSSF, ask for account name
                 account_name = self.get_account_name_for_zssf()
@@ -1074,7 +1131,7 @@ class ModernExcelProcessor:
                 if narration is None:  # User cancelled
                     return
                 
-                xml_content = self.processor.generate_zssf_xml(result, company_name, account_name, narration)
+                xml_content = self.processor.generate_zssf_xml(result, company_name, account_name, narration, self.selected_date)
             elif upload_type == "zhsf":
                 # For ZHSF, ask for account name
                 account_name = self.get_account_name_for_zhsf()
@@ -1097,7 +1154,7 @@ class ModernExcelProcessor:
                 if narration is None:  # User cancelled
                     return
                 
-                xml_content = self.processor.generate_zhsf_xml(result, company_name, account_name, narration)
+                xml_content = self.processor.generate_zhsf_xml(result, company_name, account_name, narration, self.selected_date)
             else:
                 messagebox.showerror("Error", f"Unknown upload type: {upload_type}")
                 return
@@ -1608,13 +1665,79 @@ class ModernExcelProcessor:
             )
             change_company_btn.pack(anchor=tk.E)
         
-        # Title section with Download Example button
-        title_section = tk.Frame(header_frame, bg=self.colors['light'])
-        title_section.pack(fill=tk.X, pady=(0, 5))
+        # Professional Date Picker section with Calendar widget
+        date_section = tk.Frame(header_frame, bg=self.colors['white'], relief=tk.RIDGE, bd=2)
+        date_section.pack(fill=tk.X, pady=(0, 20), ipady=15)
         
-        # Left side - Download Example button
+        # Date picker container
+        date_container = tk.Frame(date_section, bg=self.colors['white'])
+        date_container.pack()
+        
+        # Date label
+        date_label = tk.Label(
+            date_container, 
+            text="📅 Voucher Date:", 
+            font=('Arial', 14, 'bold'),
+            bg=self.colors['white'],
+            fg=self.colors['primary']
+        )
+        date_label.pack(side=tk.LEFT, padx=(20, 15))
+        
+        # Professional Calendar Date Picker with dropdown
+        self.date_picker = DateEntry(
+            date_container,
+            width=15,
+            background=self.colors['primary'],
+            foreground=self.colors['white'],
+            borderwidth=2,
+            font=('Arial', 14, 'bold'),
+            date_pattern='yyyy-mm-dd',
+            state='readonly',
+            year=datetime.now().year,
+            month=datetime.now().month,
+            day=datetime.now().day
+        )
+        self.date_picker.pack(side=tk.LEFT, padx=(0, 20))
+        
+        # Helper text
+        date_help = tk.Label(
+            date_container,
+            text="Click to select date from calendar",
+            font=('Arial', 10, 'italic'),
+            bg=self.colors['white'],
+            fg=self.colors['secondary']
+        )
+        date_help.pack(side=tk.LEFT)
+        
+        # Compact title section - Left aligned to save space
+        title_section = tk.Frame(header_frame, bg=self.colors['light'])
+        title_section.pack(fill=tk.X, pady=(0, 10))
+        
+        # Left side - Title (compact, left aligned)
+        title_left = tk.Frame(title_section, bg=self.colors['light'])
+        title_left.pack(side=tk.LEFT, padx=(10, 0))
+        
+        title_label = tk.Label(
+            title_left,
+            text="� Excel File Processor & XML Generator",
+            font=('Arial', 16, 'bold'),
+            bg=self.colors['light'],
+            fg=self.colors['primary']
+        )
+        title_label.pack(anchor=tk.W)
+        
+        subtitle_label = tk.Label(
+            title_left,
+            text="Upload Excel files and generate Tally-compatible XML for import",
+            font=('Arial', 10),
+            bg=self.colors['light'],
+            fg=self.colors['dark']
+        )
+        subtitle_label.pack(anchor=tk.W)
+        
+        # Right side - Download Example button
         download_frame = tk.Frame(title_section, bg=self.colors['light'])
-        download_frame.pack(side=tk.LEFT)
+        download_frame.pack(side=tk.RIGHT, padx=(0, 10))
         
         download_btn = ttk.Button(
             download_frame,
@@ -1622,17 +1745,7 @@ class ModernExcelProcessor:
             command=self.download_example_file,
             style='Primary.TButton'
         )
-        download_btn.pack(pady=5)
-        
-        # Center - Title
-        title_center = tk.Frame(title_section, bg=self.colors['light'])
-        title_center.pack(expand=True)
-        
-        title_label = ttk.Label(title_center, text="📊 Excel File Processor & XML Generator", style='Title.TLabel')
-        title_label.pack()
-        
-        subtitle_label = ttk.Label(title_center, text="Upload Excel files and generate Tally-compatible XML for import", style='Subtitle.TLabel')
-        subtitle_label.pack()
+        download_btn.pack()
         
         # # Description line
         # desc_label = ttk.Label(header_frame, text="Supports header extraction, employee data processing, and JSON export", style='Info.TLabel')
@@ -1787,6 +1900,10 @@ class ModernExcelProcessor:
     
     def process_file(self, section_type):
         """Process the selected Excel file."""
+        # Get selected date from calendar date picker
+        selected_date = self.date_picker.get_date()
+        self.selected_date = selected_date.strftime("%Y-%m-%d")
+        
         file_path_var = getattr(self, f"{section_type}_file_path")
         file_path = file_path_var.get()
         
