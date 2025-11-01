@@ -540,32 +540,51 @@ class ModernExcelProcessor:
     
     def _handle_companies_result(self, result):
         """Handle companies loading result."""
+        # Check if widgets still exist (screen not destroyed)
+        try:
+            if not self.refresh_btn.winfo_exists():
+                return
+        except:
+            return
+        
         # Restore refresh button
-        self.refresh_btn.configure(state='normal', text='🔄 Refresh Companies')
+        try:
+            self.refresh_btn.configure(state='normal', text='🔄 Refresh Companies')
+        except:
+            return
         
         if result.get("success", False):
             companies = result.get("companies", [])
             if companies:
                 # Populate dropdown
-                self.company_dropdown['values'] = companies
-                self.company_var.set("-- Please Select a Company --")
-                self.company_status_label.configure(
-                    text=f"✅ Successfully loaded {len(companies)} companies from Tally",
-                    fg=self.colors['success']
-                )
+                try:
+                    self.company_dropdown['values'] = companies
+                    self.company_var.set("-- Please Select a Company --")
+                    self.company_status_label.configure(
+                        text=f"✅ Successfully loaded {len(companies)} companies from Tally",
+                        fg=self.colors['success']
+                    )
+                except:
+                    pass
             else:
-                self.company_var.set("No companies available")
-                self.company_status_label.configure(
-                    text="⚠️ No companies found in your Tally database",
-                    fg=self.colors['warning']
-                )
+                try:
+                    self.company_var.set("No companies available")
+                    self.company_status_label.configure(
+                        text="⚠️ No companies found in your Tally database",
+                        fg=self.colors['warning']
+                    )
+                except:
+                    pass
         else:
             error_msg = result.get("error", "Unknown error")
-            self.company_var.set("Connection failed - Click Refresh")
-            self.company_status_label.configure(
-                text=f"❌ Connection Error: {error_msg}",
-                fg=self.colors['danger']
-            )
+            try:
+                self.company_var.set("Connection failed - Click Refresh")
+                self.company_status_label.configure(
+                    text=f"❌ Connection Error: {error_msg}",
+                    fg=self.colors['danger']
+                )
+            except:
+                pass
     
 
     
@@ -696,7 +715,7 @@ class ModernExcelProcessor:
         )
         date_label.pack(side=tk.LEFT, padx=(10, 10))
         
-        # Professional Calendar Date Picker
+        # Professional Calendar Date Picker - WORKING
         self.date_picker = DateEntry(
             date_container,
             width=15,
@@ -715,7 +734,6 @@ class ModernExcelProcessor:
             borderwidth=2,
             font=('Arial', 11, 'bold'),
             date_pattern='yyyy-mm-dd',
-            state='readonly',
             year=datetime.now().year,
             month=datetime.now().month,
             day=datetime.now().day
