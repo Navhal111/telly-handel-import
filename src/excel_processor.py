@@ -238,10 +238,10 @@ class ExcelProcessor:
                 
                 # Extract overtime from specific columns with proper key mapping (adjusted -1)
                 overtime_key_mapping = {
-                    9: 'overtime_125',    # Column K - OVERTIME @ 1.25
-                    11: 'overtime_150',    # Column M - OVERTIME @ 1.50  
-                    13: 'overtime_200',    # Column O - OVERTIME @ 2.00
-                    15: 'night_hours',     # Column Q - Night Hours
+                    11: 'overtime_125',    # Column K - OVERTIME @ 1.25
+                    13: 'overtime_150',    # Column M - OVERTIME @ 1.50  
+                    15: 'overtime_200',    # Column O - OVERTIME @ 2.00
+                    17: 'night_hours',     # Column Q - Night Hours
                 }
                 
                 for col_idx, xml_key in overtime_key_mapping.items():
@@ -490,25 +490,43 @@ class ExcelProcessor:
                     # All columns after the first four become salary components (skip S.NO, EMPL.NO, EMPLOYEE NAME, Attendance)
                     salary_components = {}
                     if len(all_columns) > 4:
-                        # Special mapping for overtime amount columns based on position
+                        # Direct position mapping for overtime columns - read from specific column indices
                         overtime_position_mapping = {
-                            12: 'Overtime @ 1.25',  # First OVERTIME ON column (0-indexed position 12)
-                            14: 'Overtime @ 1.50',  # Second OVERTIME ON column (0-indexed position 14)  
-                            16: 'Overtime @ 2.00',  # Third OVERTIME ON column (0-indexed position 16)
+                            12: 'Overtime @ 1.25',  # Column index 12 (0-indexed)
+                            14: 'Overtime @ 1.50',  # Column index 14 (0-indexed)
+                            16: 'Overtime @ 2.00',  # Column index 16 (0-indexed)
                         }
                         
                         for col_idx, col_name in all_columns[4:]:  # Skip first four columns (S.NO, EMPL.NO, EMPLOYEE NAME, Attendance)
                             # Skip excluded columns (calculated fields)
                             if col_name.upper().strip() in excluded_columns:
                                 continue
-                                
-                            col_value = all_data.get(col_name, 0)
                             
-                            # Special handling for OVERTIME ON columns based on their position (these contain the amounts)
+                            # Special handling for OVERTIME ON columns - read directly from cell using row.iloc[col_idx]
                             if col_name.upper().strip() == 'OVERTIME ON' and col_idx in overtime_position_mapping:
                                 xml_payhead_name = overtime_position_mapping[col_idx]
+                                
+                                # READ DIRECTLY FROM THE CELL AT THIS COLUMN INDEX
+                                try:
+                                    col_value = row.iloc[col_idx]
+                                    if pd.isna(col_value):
+                                        col_value = 0
+                                    else:
+                                        # Convert to float
+                                        try:
+                                            col_value = float(str(col_value).replace(',', ''))
+                                        except:
+                                            col_value = 0
+                                    
+                                    # 🐛 DEBUG: Print overtime values for specific employee
+                                    if employee_record.get('employee_name') == 'Shaaban Said Khamis':
+                                        print(f"🐛 DEBUG - {employee_record.get('employee_name')} - {xml_payhead_name}: col_idx={col_idx}, value={col_value}")
+                                except Exception as e:
+                                    print(f"⚠️ Error reading overtime column {col_idx}: {str(e)}")
+                                    col_value = 0
                             else:
-                                # Regular mapping for other columns
+                                # Regular mapping for other columns - use all_data
+                                col_value = all_data.get(col_name, 0)
                                 xml_payhead_name = excel_to_xml_mapping.get(col_name.upper().strip(), col_name)
                             
                             # Only include numeric values that are not zero

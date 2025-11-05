@@ -271,8 +271,8 @@ class ModernExcelProcessor:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Excel File Processor - Attendance & Payroll")
-        self.root.geometry("1000x680")
-        self.root.minsize(900, 600)
+        self.root.geometry("1100x750")
+        self.root.minsize(1000, 650)
         
         # Configure style
         self.setup_style()
@@ -638,13 +638,13 @@ class ModernExcelProcessor:
     
     def create_main_upload_screen(self):
         """Create the main upload screen with attendance and payroll options."""
-        # Main container (more compact)
-        self.main_frame = tk.Frame(self.root, bg=self.colors['light'], padx=20, pady=15)
+        # Main container (ultra compact for fitting all content)
+        self.main_frame = tk.Frame(self.root, bg=self.colors['light'], padx=10, pady=8)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Header section (more compact)
+        # Header section (ultra compact)
         header_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
-        header_frame.pack(fill=tk.X, pady=(0, 20))
+        header_frame.pack(fill=tk.X, pady=(0, 8))
         
         # Company info banner with main title on left
         is_test_mode = "TEST COMPANY" in self.selected_company
@@ -654,18 +654,18 @@ class ModernExcelProcessor:
         company_banner = tk.Frame(header_frame, bg=banner_color, relief=tk.RAISED, bd=1)
         company_banner.pack(fill=tk.X, pady=(0, 15))
         
-        # Banner content container
+        # Banner content container - COMPACT
         banner_content = tk.Frame(company_banner, bg=banner_color)
-        banner_content.pack(fill=tk.X, pady=10)
+        banner_content.pack(fill=tk.X, pady=5)
         
-        # Left side - Main Title
+        # Left side - Main Title - COMPACT
         left_side = tk.Frame(banner_content, bg=banner_color)
-        left_side.pack(side=tk.LEFT, padx=(20, 0))
+        left_side.pack(side=tk.LEFT, padx=(10, 0))
         
         main_title = tk.Label(
             left_side,
             text="📊 Excel File Processor & XML Generator",
-            font=('Arial', 14, 'bold'),
+            font=('Arial', 11, 'bold'),
             bg=banner_color,
             fg=self.colors['white']
         )
@@ -673,29 +673,29 @@ class ModernExcelProcessor:
         
         subtitle = tk.Label(
             left_side,
-            text="Upload Excel files and generate Tally-compatible XML for import",
-            font=('Arial', 9),
+            text="Upload Excel files and generate Tally-compatible XML",
+            font=('Arial', 8),
             bg=banner_color,
             fg=self.colors['white']
         )
         subtitle.pack(anchor=tk.W)
         
-        # Right side - Company info
+        # Right side - Company info - COMPACT
         right_side = tk.Frame(banner_content, bg=banner_color)
-        right_side.pack(side=tk.RIGHT, padx=(0, 20))
+        right_side.pack(side=tk.RIGHT, padx=(0, 10))
         
         company_info = tk.Label(
             right_side,
-            text=f"{banner_icon} {'Test Mode - ' if is_test_mode else ''}{self.selected_company}",
-            font=('Arial', 12, 'bold'),
+            text=f"{banner_icon} {'Test - ' if is_test_mode else ''}{self.selected_company[:30]}...",
+            font=('Arial', 9, 'bold'),
             bg=banner_color,
             fg=self.colors['white']
         )
         company_info.pack()
         
-        # Date Picker section - LEFT side below company banner
+        # Date Picker section - LEFT side below company banner - COMPACT
         date_and_download_section = tk.Frame(header_frame, bg=self.colors['light'])
-        date_and_download_section.pack(fill=tk.X, pady=(0, 15))
+        date_and_download_section.pack(fill=tk.X, pady=(0, 5))
         
         # Left side - Date Picker
         date_frame = tk.Frame(date_and_download_section, bg=self.colors['light'])
@@ -740,9 +740,18 @@ class ModernExcelProcessor:
         )
         self.date_picker.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Right side - Download Example button
+        # Right side - Back and Download Example buttons
         download_frame = tk.Frame(date_and_download_section, bg=self.colors['light'])
         download_frame.pack(side=tk.RIGHT)
+        
+        # Back button
+        back_btn = ttk.Button(
+            download_frame,
+            text="← Back",
+            command=self.show_company_selection_screen,
+            style='Secondary.TButton'
+        )
+        back_btn.pack(side=tk.LEFT, padx=(0, 10))
         
         download_btn = ttk.Button(
             download_frame,
@@ -750,174 +759,148 @@ class ModernExcelProcessor:
             command=self.download_example_file,
             style='Primary.TButton'
         )
-        download_btn.pack()
+        download_btn.pack(side=tk.LEFT)
         
-        # Content container - Grid layout for multiple upload boxes
+        # Content container - Grid layout for multiple upload boxes - COMPACT
         content_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
-        content_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+        content_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
         
-        # Create grid for upload cards (3 cards in a row)
+        # Create grid for upload cards (3 cards in a row) - COMPACT
         # Row 1: Current upload types
         row1_frame = tk.Frame(content_frame, bg=self.colors['light'])
-        row1_frame.pack(fill=tk.X, pady=(0, 10))
+        row1_frame.pack(fill=tk.X, pady=(0, 3))
         
-        # Left card - Attendance
+        # Left card - Attendance - COMPACT spacing
         left_frame = tk.Frame(row1_frame, bg=self.colors['light'])
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 3))
         
-        # Center card - Payroll  
+        # Center card - Payroll - COMPACT spacing
         center_frame = tk.Frame(row1_frame, bg=self.colors['light'])
-        center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 5))
+        center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(3, 3))
         
-        # Right card - PAYE
+        # Right card - PAYE - COMPACT spacing
         right_frame = tk.Frame(row1_frame, bg=self.colors['light'])
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(3, 0))
         
-        # Attendance Section
-        self.create_upload_card(left_frame, "Attendance Upload", "attendance", "📊", 
-                               "Upload attendance Excel files and generate XML for Tally import")
+        # Attendance Section - No description to save space
+        self.create_upload_card(left_frame, "Attendance", "attendance", "📊", "")
         
-        # Payroll Section
-        self.create_upload_card(center_frame, "Payroll Upload", "payroll", "💰", 
-                               "Upload payroll Excel files and generate payment XML for Tally import")
+        # Payroll Section - No description to save space
+        self.create_upload_card(center_frame, "Payroll", "payroll", "💰", "")
         
-        # PAYE Section
-        self.create_upload_card(right_frame, "PAYE Upload", "paye", "🏛️", 
-                               "Upload PAYE Excel sheet and generate PAYE/SDL payment XML for Tally import")
+        # PAYE Section - No description to save space
+        self.create_upload_card(right_frame, "PAYE", "paye", "🏛️", "")
         
-        # Row 2: Additional upload types
+        # Row 2: Additional upload types - COMPACT
         row2_frame = tk.Frame(content_frame, bg=self.colors['light'])
-        row2_frame.pack(fill=tk.X, pady=(10, 0))
+        row2_frame.pack(fill=tk.X, pady=(3, 0))
         
-        # Left card - ZSSF
+        # Left card - ZSSF - COMPACT spacing
         zssf_frame = tk.Frame(row2_frame, bg=self.colors['light'])
-        zssf_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        zssf_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 3))
         
-        # Right card - ZHSF
+        # Right card - ZHSF - COMPACT spacing
         zhsf_frame = tk.Frame(row2_frame, bg=self.colors['light'])
-        zhsf_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        zhsf_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(3, 0))
         
         # Empty frame for balance (since we only have 2 cards in this row)
         empty_frame = tk.Frame(row2_frame, bg=self.colors['light'])
-        empty_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        empty_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(3, 0))
         
-        # ZSSF Section
-        self.create_upload_card(zssf_frame, "ZSSF Upload", "zssf", "🏦", 
-                               "Upload ZSSF Excel sheet and generate XML for Tally import")
+        # ZSSF Section - No description to save space
+        self.create_upload_card(zssf_frame, "ZSSF", "zssf", "🏦", "")
         
-        # ZHSF Section  
-        self.create_upload_card(zhsf_frame, "ZHSF Upload", "zhsf", "🏥", 
-                               "Upload ZHSF Excel sheet and generate XML for Tally import")
+        # ZHSF Section - No description to save space
+        self.create_upload_card(zhsf_frame, "ZHSF", "zhsf", "🏥", "")
         
-        # Status section at bottom
+        # Status section at bottom - ULTRA COMPACT
         status_frame = tk.Frame(self.main_frame, bg=self.colors['light'])
-        status_frame.pack(fill=tk.X, pady=(20, 0))
+        status_frame.pack(fill=tk.X, pady=(5, 0))
         
         status_title = tk.Label(
             status_frame,
             text="📊 Status",
-            font=('Arial', 16, 'bold'),
+            font=('Arial', 10, 'bold'),
             bg=self.colors['light'],
             fg=self.colors['primary']
         )
-        status_title.pack(anchor=tk.W, pady=(0, 10))
+        status_title.pack(anchor=tk.W, pady=(0, 3))
         
-        # Status display
+        # Status display - ULTRA COMPACT
         self.status_frame = tk.Frame(status_frame, bg=self.colors['white'], relief=tk.SOLID, bd=1)
-        self.status_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.status_frame.pack(fill=tk.X, padx=2, pady=2)
         
         self.status_text = tk.Label(
             self.status_frame,
             text="✨ Ready to process Excel files and generate XML...",
-            font=('Arial', 12),
+            font=('Arial', 9),
             bg=self.colors['white'],
             fg=self.colors['dark'],
             wraplength=800,
             justify=tk.LEFT,
-            pady=15,
-            padx=20
+            pady=5,
+            padx=10
         )
         self.status_text.pack(anchor=tk.W)
     
     def create_upload_card(self, parent, title, upload_type, icon, description):
-        """Create a compact card for file upload functionality."""
-        # Main card container - VERY COMPACT
+        """Create a ultra-compact card for file upload functionality."""
+        # Main card container - ULTRA COMPACT
         card_frame = tk.Frame(parent, bg=self.colors['white'], relief=tk.RAISED, bd=1)
-        card_frame.pack(fill=tk.BOTH, expand=True, padx=3, pady=3)
+        card_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # Card header - COMPACT
+        # Card header - ULTRA COMPACT
         header = tk.Frame(card_frame, bg=self.colors['primary'])
         header.pack(fill=tk.X)
         
         header_label = tk.Label(
             header,
             text=f"{icon} {title}",
-            font=('Arial', 11, 'bold'),
+            font=('Arial', 9, 'bold'),
             bg=self.colors['primary'],
             fg=self.colors['white'],
-            pady=5
+            pady=3
         )
         header_label.pack()
         
-        # Card content - MINIMAL padding
-        content = tk.Frame(card_frame, bg=self.colors['white'], padx=8, pady=8)
+        # Card content - ULTRA MINIMAL padding
+        content = tk.Frame(card_frame, bg=self.colors['white'], padx=5, pady=5)
         content.pack(fill=tk.BOTH, expand=True)
         
-        # Description - SMALLER
-        desc_label = tk.Label(
-            content,
-            text=description,
-            font=('Arial', 8),
-            bg=self.colors['white'],
-            fg=self.colors['dark'],
-            wraplength=220,
-            justify=tk.LEFT
-        )
-        desc_label.pack(pady=(0, 8))
-        
-        # File selection area - COMPACT
+        # File selection area - ULTRA COMPACT (NO description to save space)
         file_frame = tk.Frame(content, bg=self.colors['light'], relief=tk.SUNKEN, bd=1)
-        file_frame.pack(fill=tk.X, pady=(0, 8))
+        file_frame.pack(fill=tk.X, pady=(0, 5))
         
         # File path variable
         file_path_var = tk.StringVar(value="No file selected")
         setattr(self, f"{upload_type}_file_path", file_path_var)
         setattr(self, f"{upload_type}_result", None)
         
-        file_label = tk.Label(
-            file_frame,
-            text="📁 File:",
-            font=('Arial', 8, 'bold'),
-            bg=self.colors['light'],
-            fg=self.colors['dark']
-        )
-        file_label.pack(anchor=tk.W, padx=5, pady=(5, 2))
-        
         file_display = tk.Label(
             file_frame,
             textvariable=file_path_var,
-            font=('Arial', 8),
+            font=('Arial', 7),
             bg=self.colors['light'],
             fg=self.colors['dark'],
-            wraplength=200,
+            wraplength=180,
             justify=tk.LEFT
         )
-        file_display.pack(anchor=tk.W, padx=5, pady=(0, 5))
+        file_display.pack(anchor=tk.W, padx=4, pady=3)
         
-        # Buttons - SMALLER
+        # Buttons - ULTRA COMPACT
         btn_frame = tk.Frame(content, bg=self.colors['white'])
         btn_frame.pack(fill=tk.X)
         
-        # Browse button - COMPACT
+        # Browse button - ULTRA COMPACT
         browse_btn = ttk.Button(
             btn_frame,
             text="📂 Browse",
             command=lambda: self.browse_upload_file(upload_type),
             style='Primary.TButton'
         )
-        browse_btn.pack(fill=tk.X, pady=(0, 5))
+        browse_btn.pack(fill=tk.X, pady=(0, 3))
         
-        # Process button - COMPACT
+        # Process button - ULTRA COMPACT
         process_btn = ttk.Button(
             btn_frame,
             text=f"⚙️ Process",
@@ -925,10 +908,10 @@ class ModernExcelProcessor:
             style='Secondary.TButton',
             state='disabled'
         )
-        process_btn.pack(fill=tk.X, pady=(0, 4))
+        process_btn.pack(fill=tk.X, pady=(0, 3))
         setattr(self, f"{upload_type}_process_btn", process_btn)
         
-        # Generate XML button - COMPACT
+        # Generate XML button - ULTRA COMPACT
         xml_btn = ttk.Button(
             btn_frame,
             text="📤 Generate XML",
@@ -936,7 +919,7 @@ class ModernExcelProcessor:
             style='Success.TButton',
             state='disabled'
         )
-        xml_btn.pack(fill=tk.X, pady=(0, 3))
+        xml_btn.pack(fill=tk.X)
         setattr(self, f"{upload_type}_xml_btn", xml_btn)
     
     def browse_upload_file(self, upload_type):
@@ -1055,6 +1038,10 @@ class ModernExcelProcessor:
             return
         
         try:
+            # Get current selected date from date picker before generating XML
+            selected_date = self.date_picker.get_date()
+            self.selected_date = selected_date.strftime("%Y-%m-%d")
+            
             self.update_status(f"🔄 Generating {upload_type} XML...")
             
             # Use selected company name, or extract from result if testing
@@ -1181,78 +1168,63 @@ class ModernExcelProcessor:
                 # Always save XML file first (regardless of Tally server status)
                 output_path = self.processor.save_xml_file(xml_content, upload_type)
                 if output_path:
-                    # Show success message for XML generation
                     file_type_name = "PAYE" if upload_type == "paye" else upload_type.title()
-                    self.update_status(f"✅ {file_type_name} XML file created: {output_path}")
+                    self.update_status(f"📄 {file_type_name} XML file created, uploading to Tally...")
                     
                     # Check if we're in test mode (no Tally server)
                     is_test_mode = "TEST COMPANY" in self.selected_company
                     
                     if is_test_mode:
-                        # Test mode - skip Tally upload, just show XML success
-                        messagebox.showinfo("XML Generated Successfully (Test Mode)", 
-                                          f"{file_type_name} XML file has been generated and saved!\n\n"
-                                          f"📁 File: {output_path}\n\n"
-                                          f"🧪 Test Mode: Tally upload skipped\n"
-                                          f"You can manually import this file into Tally when ready.")
-                        self.update_status(f"✅ {file_type_name} XML generated successfully (Test Mode - No Tally Upload)")
-                        
-                        # Ask if user wants to open file location
-                        if messagebox.askyesno("Open File Location?", 
-                                             f"XML file saved successfully!\n\n"
-                                             f"📁 Location: {output_path}\n\n"
-                                             f"Would you like to open the file location?"):
-                            self.open_file_location(output_path)
+                        # Test mode - skip Tally upload
+                        self.update_status(f"✅ {file_type_name} XML saved (Test Mode - No Tally Upload)")
+                        messagebox.showinfo("Success", f"✅ {file_type_name} XML file saved successfully!\n(Test Mode - Tally upload skipped)")
                     else:
-                        # Production mode - show success and attempt Tally upload
-                        messagebox.showinfo("XML Generated Successfully", 
-                                          f"{file_type_name} XML file has been generated and saved!\n\n"
-                                          f"File: {output_path}\n\n"
-                                          f"You can import this file directly into Tally or continue with automatic upload.")
-                        
-                        # Now attempt to upload to Tally
-                        self.update_status(f"🚀 Attempting to upload {file_type_name} to Tally server...")
+                        # Production mode - attempt Tally upload
+                        self.update_status(f"🚀 Uploading {file_type_name} to Tally...")
                         
                         try:
-                            if upload_type == "attendance":
-                                upload_result = self.api_service.upload_attendance_data(result, company_name)
-                            elif upload_type == "payroll":
-                                upload_result = self.api_service.upload_payroll_data(result, company_name, account_name)
-                            else:  # paye
-                                upload_result = self.api_service.upload_paye_data(result, company_name, account_name)
+                            # Use the generated XML content and upload it
+                            upload_result = self.api_service.upload_xml_to_tally(xml_content, file_type_name)
                         
                             if upload_result and upload_result.get("success"):
-                                self.update_status(f"🎉 {file_type_name} successfully uploaded to Tally server!")
-                                messagebox.showinfo("Upload Successful", 
-                                                  f"{file_type_name} data has been successfully uploaded to Tally!\n\n"
-                                                  f"✅ XML file saved: {output_path}\n"
-                                                  f"✅ Data uploaded to Tally server\n\n"
-                                                  f"The voucher should now be available in Tally.")
+                                self.update_status(f"✅ {file_type_name} uploaded successfully to Tally!")
+                                messagebox.showinfo("Upload Successful", f"✅ {file_type_name} uploaded to Tally successfully!")
                             else:
+                                # Extract detailed error information
                                 error_msg = upload_result.get("error", "Unknown upload error") if upload_result else "Upload failed"
-                                self.update_status(f"⚠️ {file_type_name} XML saved, but Tally upload failed: {error_msg}")
+                                lineerror = upload_result.get("lineerror", "") if upload_result else ""
                                 
-                                # Show option to open file location
-                                if messagebox.askyesno("Upload Failed - XML Saved", 
-                                                     f"Tally upload failed: {error_msg}\n\n"
-                                                     f"✅ XML file has been saved successfully: {output_path}\n\n"
-                                                     f"You can manually import this file into Tally.\n"
-                                                     f"Would you like to open the file location?"):
-                                    self.open_file_location(output_path)
+                                # Build detailed error message
+                                detailed_error = f"❌ Failed to upload {file_type_name} to Tally:\n\n"
+                                detailed_error += f"Error: {error_msg}\n"
+                                if lineerror:
+                                    detailed_error += f"\nTally Message:\n{lineerror}"
+                                
+                                # Print response to console for debugging
+                                print("\n" + "="*80)
+                                print(f"❌ UPLOAD FAILED - {file_type_name}")
+                                print("="*80)
+                                print(f"Error: {error_msg}")
+                                if lineerror:
+                                    print(f"Line Error: {lineerror}")
+                                if upload_result:
+                                    response = upload_result.get("response", "")
+                                    if response:
+                                        print("\nFull Tally Response:")
+                                        print(response)
+                                print("="*80 + "\n")
+                                
+                                self.update_status(f"❌ {file_type_name} upload failed: {error_msg}")
+                                messagebox.showerror("Upload Failed", detailed_error)
                                     
                         except Exception as upload_error:
-                            self.update_status(f"⚠️ {file_type_name} XML saved, but Tally server error: {str(upload_error)}")
-                            
-                            # Show option to open file location
-                            if messagebox.askyesno("Tally Server Error - XML Saved", 
-                                                 f"Could not connect to Tally server: {str(upload_error)}\n\n"
-                                                 f"✅ XML file has been saved successfully: {output_path}\n\n"
-                                                 f"You can manually import this file into Tally when the server is available.\n"
-                                                 f"Would you like to open the file location?"):
-                                self.open_file_location(output_path)
+                            self.update_status(f"❌ Tally server error: {str(upload_error)}")
+                            messagebox.showerror("Tally Server Error", f"❌ Could not connect to Tally:\n\n{str(upload_error)}")
                 else:
+                    self.update_status(f"❌ Failed to save XML file")
                     messagebox.showerror("Error", "Failed to save XML file.")
             else:
+                self.update_status(f"❌ Failed to generate XML content")
                 messagebox.showerror("Error", "Failed to generate XML content.")
                 
         except Exception as e:
