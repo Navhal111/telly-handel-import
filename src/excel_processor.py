@@ -1358,36 +1358,41 @@ class ExcelProcessor:
             header_row = df.iloc[employee_start_row]
             
             # Create column mapping for PAYE sheet
+            # CRITICAL: Read from Row 5 - Column D = PAYE, Column F = SDL
             column_mapping = {}
+            paye_found = False
+            sdl_found = False
+            
             for idx, header in enumerate(header_row):
                 if not pd.isna(header):
                     header_str = str(header).strip().upper()
+                    
+                    # Employee name
                     if 'EMPLOYEE' in header_str and 'NAME' in header_str:
                         column_mapping['employee_name'] = idx
-                    elif header_str == 'PAYE':
+                        print(f"✅ Found Employee Name at column {idx}")
+                    
+                    # PAYE - EXACT match only, and only take the FIRST occurrence
+                    elif header_str == 'PAYE' and not paye_found:
                         column_mapping['paye'] = idx
-                    elif header_str == 'SDL':
+                        paye_found = True
+                        print(f"✅ Found PAYE at column {idx} (Column {chr(65+idx)})")
+                    
+                    # SDL - EXACT match only, and only take the FIRST occurrence  
+                    elif header_str == 'SDL' and not sdl_found:
                         column_mapping['sdl'] = idx
+                        sdl_found = True
+                        print(f"✅ Found SDL at column {idx} (Column {chr(65+idx)})")
+                    
+                    # Other fields (for reference)
                     elif 'GROSS' in header_str and 'SALARY' in header_str:
                         column_mapping['gross_salary'] = idx
                     elif header_str == 'BASIC':
                         column_mapping['basic'] = idx
-                    elif 'ALLOW' in header_str:
-                        column_mapping['allowance'] = idx
-                    elif 'DEDUCTION' in header_str:
-                        column_mapping['deduction'] = idx
-                    elif 'TIN' in header_str:
+                    elif header_str == 'TIN':
                         column_mapping['tin'] = idx
-                    elif 'ZSSF' in header_str and '#' in header_str:
-                        column_mapping['zssf_no'] = idx
-                    elif header_str == 'NAME':
-                        column_mapping['name'] = idx
-                    elif header_str == 'ZSSF':
-                        column_mapping['zssf'] = idx
-                    elif header_str == 'ZHSF':
-                        column_mapping['zhsf'] = idx
             
-            print(f"🎯 PAYE Column mapping: {column_mapping}")
+            print(f"🎯 PAYE Final Column mapping: {column_mapping}")
             
             # Extract data rows
             data_rows = df.iloc[employee_start_row + 1:]
@@ -1471,10 +1476,24 @@ class ExcelProcessor:
             else:
                 formatted_date = "20251230"
             
-            # Calculate totals
-            total_paye = sum(emp.get('paye', 0) for emp in employee_data)
-            total_sdl = sum(emp.get('sdl', 0) for emp in employee_data)
+            # Filter out employees with missing or placeholder names BEFORE calculating totals
+            valid_employees = []
+            for emp in employee_data:
+                emp_name = emp.get("employee_name", "").strip()
+                # Skip employees with missing names or placeholder names (Employee_1, Employee_9, etc.)
+                if not emp_name or emp_name.startswith("Employee_"):
+                    print(f"⚠️ Excluding employee from PAYE calculation: {emp_name or 'Empty'} - PAYE: {emp.get('paye', 0)}, SDL: {emp.get('sdl', 0)}")
+                    continue
+                valid_employees.append(emp)
+            
+            print(f"✅ Valid employees for PAYE: {len(valid_employees)} out of {len(employee_data)}")
+            
+            # Calculate totals ONLY from valid employees (those with real names)
+            total_paye = sum(emp.get('paye', 0) for emp in valid_employees)
+            total_sdl = sum(emp.get('sdl', 0) for emp in valid_employees)
             total_amount = total_paye + total_sdl
+            
+            print(f"💰 PAYE Total: {total_paye:.2f}, SDL Total: {total_sdl:.2f}")
             
             # Start building XML for PAYE Payment voucher
             xml_lines = [
@@ -1614,13 +1633,10 @@ class ExcelProcessor:
                     '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'
                 ])
                 
-                # Add cost center allocations for each employee's PAYE
-                for emp in employee_data:
+                # Add cost center allocations for each valid employee's PAYE
+                for emp in valid_employees:
                     if emp.get('paye', 0) > 0:
-                        # Ensure employee name is always a string
-                        emp_name = emp.get("employee_name") or "Unknown Employee"
-                        if emp_name is None:
-                            emp_name = "Unknown Employee"
+                        emp_name = emp.get("employee_name", "").strip()
                         xml_lines.extend([
                             '        <COSTCENTREALLOCATIONS.LIST>',
                             f'         <NAME>{emp_name}</NAME>',
@@ -1678,13 +1694,10 @@ class ExcelProcessor:
                     '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'
                 ])
                 
-                # Add cost center allocations for each employee's SDL
-                for emp in employee_data:
+                # Add cost center allocations for each valid employee's SDL
+                for emp in valid_employees:
                     if emp.get('sdl', 0) > 0:
-                        # Ensure employee name is always a string
-                        emp_name = emp.get("employee_name") or "Unknown Employee"
-                        if emp_name is None:
-                            emp_name = "Unknown Employee"
+                        emp_name = emp.get("employee_name", "").strip()
                         xml_lines.extend([
                             '        <COSTCENTREALLOCATIONS.LIST>',
                             f'         <NAME>{emp_name}</NAME>',
@@ -1898,10 +1911,24 @@ class ExcelProcessor:
             else:
                 formatted_date = "20251230"
             
-            # Calculate totals for ZHSF - Employee 3.5% and TWA 3.5%
-            total_employee_zhsf = sum(emp.get('employee_35', 0) for emp in employee_data)
-            total_twa_zhsf = sum(emp.get('twa_35', 0) for emp in employee_data)
-            total_amount = total_employee_zhsf + total_twa_zhsf
+            # Get ZHSF columns info from first employee record (stored during extraction)
+            zhsf_columns = employee_data[0].get('_zhsf_columns_', []) if employee_data else []
+            
+            if not zhsf_columns:
+                print("❌ No ZHSF column metadata found!")
+                raise ValueError("No ZHSF columns metadata")
+            
+            print(f"📊 Generating XML for {len(zhsf_columns)} ZHSF columns")
+            
+            # Calculate total for each ZHSF column
+            column_totals = []
+            for col_idx, ledger_name, field_key in zhsf_columns:
+                total = sum(emp.get(field_key, 0) for emp in employee_data if '_zhsf_columns_' not in str(field_key))
+                column_totals.append((ledger_name, field_key, total))
+                print(f"  {ledger_name}: {total:.2f}")
+            
+            # Calculate grand total
+            total_amount = sum(total for _, _, total in column_totals)
             
             # Build XML content
             xml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
@@ -2001,12 +2028,16 @@ class ExcelProcessor:
       <ISVATDUTYPAID>Yes</ISVATDUTYPAID>
       <ISDELIVERYSAMEASCONSIGNEE>No</ISDELIVERYSAMEASCONSIGNEE>
       <ISDISPATCHSAMEASCONSIGNOR>No</ISDISPATCHSAMEASCONSIGNOR>
-      <CHANGEVCHMODE>No</CHANGEVCHMODE>
+      <CHANGEVCHMODE>No</CHANGEVCHMODE>'''
+
+            # Add ALLLEDGERENTRIES for each ZHSF column dynamically
+            for ledger_name, field_key, column_total in column_totals:
+                xml_content += f'''
       <ALLLEDGERENTRIES.LIST>
        <OLDAUDITENTRYIDS.LIST TYPE="Number">
         <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>
        </OLDAUDITENTRYIDS.LIST>
-       <LEDGERNAME>ZHSF Employee @ 3.5%</LEDGERNAME>
+       <LEDGERNAME>{ledger_name}</LEDGERNAME>
        <GSTCLASS/>
        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
        <LEDGERFROMITEM>No</LEDGERFROMITEM>
@@ -2015,24 +2046,24 @@ class ExcelProcessor:
        <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>
        <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>
        <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>
-       <AMOUNT>-{total_employee_zhsf:.2f}</AMOUNT>
+       <AMOUNT>-{column_total:.2f}</AMOUNT>
        <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>
        <CATEGORYALLOCATIONS.LIST>
         <CATEGORY>Primary Cost Category</CATEGORY>
         <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'''
 
-            # Add cost center allocations for each employee (Employee 3.5%)
-            for emp in employee_data:
-                emp_name = emp.get('employee_name', 'Unknown')
-                emp_employee_zhsf = emp.get('employee_35', 0)
-                if emp_employee_zhsf > 0:
-                    xml_content += f'''
+                # Add cost center allocations for each employee for this column
+                for emp in employee_data:
+                    emp_name = emp.get('employee_name', 'Unknown')
+                    emp_amount = emp.get(field_key, 0)
+                    if emp_amount > 0 and '_zhsf_columns_' not in field_key:
+                        xml_content += f'''
         <COSTCENTREALLOCATIONS.LIST>
          <NAME>{emp_name}</NAME>
-         <AMOUNT>-{emp_employee_zhsf:.2f}</AMOUNT>
+         <AMOUNT>-{emp_amount:.2f}</AMOUNT>
         </COSTCENTREALLOCATIONS.LIST>'''
 
-            xml_content += f'''
+                xml_content += f'''
        </CATEGORYALLOCATIONS.LIST>
        <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>
        <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>
@@ -2056,62 +2087,9 @@ class ExcelProcessor:
        <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>
        <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>
        <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>
-      </ALLLEDGERENTRIES.LIST>
-      <ALLLEDGERENTRIES.LIST>
-       <OLDAUDITENTRYIDS.LIST TYPE="Number">
-        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>
-       </OLDAUDITENTRYIDS.LIST>
-       <LEDGERNAME>ZHSF TWA @ 3.5%</LEDGERNAME>
-       <GSTCLASS/>
-       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-       <LEDGERFROMITEM>No</LEDGERFROMITEM>
-       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-       <ISPARTYLEDGER>No</ISPARTYLEDGER>
-       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>
-       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>
-       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>
-       <AMOUNT>-{total_twa_zhsf:.2f}</AMOUNT>
-       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>
-       <CATEGORYALLOCATIONS.LIST>
-        <CATEGORY>Primary Cost Category</CATEGORY>
-        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>'''
-
-            # Add cost center allocations for each employee (TWA 3.5%)
-            for emp in employee_data:
-                emp_name = emp.get('employee_name', 'Unknown')
-                emp_twa_zhsf = emp.get('twa_35', 0)
-                if emp_twa_zhsf > 0:
-                    xml_content += f'''
-        <COSTCENTREALLOCATIONS.LIST>
-         <NAME>{emp_name}</NAME>
-         <AMOUNT>-{emp_twa_zhsf:.2f}</AMOUNT>
-        </COSTCENTREALLOCATIONS.LIST>'''
+      </ALLLEDGERENTRIES.LIST>'''
 
             xml_content += f'''
-       </CATEGORYALLOCATIONS.LIST>
-       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>
-       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>
-       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>
-       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>
-       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>
-       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>
-       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>
-       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>
-       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>
-       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>
-       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>
-       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>
-       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>
-       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>
-       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>
-       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>
-       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>
-       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>
-       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>
-       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>
-       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>
-       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>
-      </ALLLEDGERENTRIES.LIST>
       <ALLLEDGERENTRIES.LIST>
        <OLDAUDITENTRYIDS.LIST TYPE="Number">
         <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>
@@ -2207,10 +2185,24 @@ class ExcelProcessor:
             else:
                 formatted_date = "20251230"
             
-            # Calculate totals for ZSSF
-            total_employee_zssf = sum(emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0) for emp in employee_data)
-            total_employer_zssf = total_employee_zssf  # Employer matches employee contribution
-            total_amount = total_employee_zssf + total_employer_zssf
+            # Get ZSSF columns info from first employee record (stored during extraction)
+            zssf_columns = employee_data[0].get('_zssf_columns_', []) if employee_data else []
+            
+            if not zssf_columns:
+                print("❌ No ZSSF column metadata found!")
+                raise ValueError("No ZSSF columns metadata")
+            
+            print(f"📊 Generating XML for {len(zssf_columns)} ZSSF columns")
+            
+            # Calculate total for each ZSSF column
+            column_totals = []
+            for col_idx, ledger_name, field_key in zssf_columns:
+                total = sum(emp.get(field_key, 0) for emp in employee_data if '_zssf_columns_' not in str(field_key))
+                column_totals.append((ledger_name, field_key, total))
+                print(f"  {ledger_name}: {total:.2f}")
+            
+            # Calculate grand total
+            total_amount = sum(total for _, _, total in column_totals)
             
             # Start building XML for ZSSF Payment voucher
             xml_lines = [
@@ -2314,127 +2306,67 @@ class ExcelProcessor:
                 '      <CHANGEVCHMODE>No</CHANGEVCHMODE>',
             ]
             
-            # Add ALLLEDGERENTRIES for Employee ZSSF
-            xml_lines.extend([
-                '      <ALLLEDGERENTRIES.LIST>',
-                '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
-                '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
-                '       </OLDAUDITENTRYIDS.LIST>',
-                '       <LEDGERNAME>ZSSF Employee</LEDGERNAME>',
-                '       <GSTCLASS/>',
-                '       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
-                '       <LEDGERFROMITEM>No</LEDGERFROMITEM>',
-                '       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>',
-                '       <ISPARTYLEDGER>No</ISPARTYLEDGER>',
-                '       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>',
-                '       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>',
-                '       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>',
-                f'       <AMOUNT>-{total_employee_zssf:.2f}</AMOUNT>',
-                '       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>',
-                '       <CATEGORYALLOCATIONS.LIST>',
-                '        <CATEGORY>Primary Cost Category</CATEGORY>',
-                '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
-            ])
-            
-            # Add cost center allocations for each employee
-            for emp in employee_data:
-                emp_name = emp.get('employee_name', 'Unknown')
-                emp_total_zssf = emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0)
-                if emp_total_zssf > 0:
-                    xml_lines.extend([
-                        '        <COSTCENTREALLOCATIONS.LIST>',
-                        f'         <NAME>{emp_name}</NAME>',
-                        f'         <AMOUNT>-{emp_total_zssf:.2f}</AMOUNT>',
-                        '        </COSTCENTREALLOCATIONS.LIST>',
-                    ])
-            
-            xml_lines.extend([
-                '       </CATEGORYALLOCATIONS.LIST>',
-                '       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>',
-                '       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>',
-                '       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>',
-                '       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>',
-                '       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>',
-                '       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>',
-                '       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>',
-                '       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>',
-                '       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>',
-                '       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>',
-                '       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>',
-                '       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>',
-                '       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>',
-                '       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>',
-                '       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>',
-                '       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>',
-                '       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>',
-                '       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>',
-                '       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>',
-                '       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>',
-                '       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>',
-                '       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>',
-                '      </ALLLEDGERENTRIES.LIST>',
-            ])
-            
-            # Add ALLLEDGERENTRIES for Employer ZSSF
-            xml_lines.extend([
-                '      <ALLLEDGERENTRIES.LIST>',
-                '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
-                '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
-                '       </OLDAUDITENTRYIDS.LIST>',
-                '       <LEDGERNAME>ZSSF Employer</LEDGERNAME>',
-                '       <GSTCLASS/>',
-                '       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
-                '       <LEDGERFROMITEM>No</LEDGERFROMITEM>',
-                '       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>',
-                '       <ISPARTYLEDGER>No</ISPARTYLEDGER>',
-                '       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>',
-                '       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>',
-                '       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>',
-                f'       <AMOUNT>-{total_employer_zssf:.2f}</AMOUNT>',
-                '       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>',
-                '       <CATEGORYALLOCATIONS.LIST>',
-                '        <CATEGORY>Primary Cost Category</CATEGORY>',
-                '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
-            ])
-            
-            # Add cost center allocations for employer portion
-            for emp in employee_data:
-                emp_name = emp.get('employee_name', 'Unknown')
-                emp_total_zssf = emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0)
-                if emp_total_zssf > 0:
-                    xml_lines.extend([
-                        '        <COSTCENTREALLOCATIONS.LIST>',
-                        f'         <NAME>{emp_name}</NAME>',
-                        f'         <AMOUNT>-{emp_total_zssf:.2f}</AMOUNT>',
-                        '        </COSTCENTREALLOCATIONS.LIST>',
-                    ])
-            
-            xml_lines.extend([
-                '       </CATEGORYALLOCATIONS.LIST>',
-                '       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>',
-                '       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>',
-                '       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>',
-                '       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>',
-                '       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>',
-                '       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>',
-                '       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>',
-                '       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>',
-                '       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>',
-                '       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>',
-                '       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>',
-                '       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>',
-                '       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>',
-                '       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>',
-                '       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>',
-                '       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>',
-                '       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>',
-                '       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>',
-                '       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>',
-                '       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>',
-                '       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>',
-                '       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>',
-                '      </ALLLEDGERENTRIES.LIST>',
-            ])
+            # Add ALLLEDGERENTRIES for each ZSSF column dynamically
+            for ledger_name, field_key, column_total in column_totals:
+                xml_lines.extend([
+                    '      <ALLLEDGERENTRIES.LIST>',
+                    '       <OLDAUDITENTRYIDS.LIST TYPE="Number">',
+                    '        <OLDAUDITENTRYIDS>-1</OLDAUDITENTRYIDS>',
+                    '       </OLDAUDITENTRYIDS.LIST>',
+                    f'       <LEDGERNAME>{ledger_name}</LEDGERNAME>',
+                    '       <GSTCLASS/>',
+                    '       <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+                    '       <LEDGERFROMITEM>No</LEDGERFROMITEM>',
+                    '       <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>',
+                    '       <ISPARTYLEDGER>No</ISPARTYLEDGER>',
+                    '       <ISLASTDEEMEDPOSITIVE>Yes</ISLASTDEEMEDPOSITIVE>',
+                    '       <ISCAPVATTAXALTERED>No</ISCAPVATTAXALTERED>',
+                    '       <ISCAPVATNOTCLAIMED>No</ISCAPVATNOTCLAIMED>',
+                    f'       <AMOUNT>-{column_total:.2f}</AMOUNT>',
+                    '       <SERVICETAXDETAILS.LIST>       </SERVICETAXDETAILS.LIST>',
+                    '       <CATEGORYALLOCATIONS.LIST>',
+                    '        <CATEGORY>Primary Cost Category</CATEGORY>',
+                    '        <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>',
+                ])
+                
+                # Add cost center allocations for each employee for this column
+                for emp in employee_data:
+                    emp_name = emp.get('employee_name', 'Unknown')
+                    emp_amount = emp.get(field_key, 0)
+                    if emp_amount > 0 and '_zssf_columns_' not in field_key:
+                        xml_lines.extend([
+                            '        <COSTCENTREALLOCATIONS.LIST>',
+                            f'         <NAME>{emp_name}</NAME>',
+                            f'         <AMOUNT>-{emp_amount:.2f}</AMOUNT>',
+                            '        </COSTCENTREALLOCATIONS.LIST>',
+                        ])
+                
+                xml_lines.extend([
+                    '       </CATEGORYALLOCATIONS.LIST>',
+                    '       <BANKALLOCATIONS.LIST>       </BANKALLOCATIONS.LIST>',
+                    '       <BILLALLOCATIONS.LIST>       </BILLALLOCATIONS.LIST>',
+                    '       <INTERESTCOLLECTION.LIST>       </INTERESTCOLLECTION.LIST>',
+                    '       <OLDAUDITENTRIES.LIST>       </OLDAUDITENTRIES.LIST>',
+                    '       <ACCOUNTAUDITENTRIES.LIST>       </ACCOUNTAUDITENTRIES.LIST>',
+                    '       <AUDITENTRIES.LIST>       </AUDITENTRIES.LIST>',
+                    '       <INPUTCRALLOCS.LIST>       </INPUTCRALLOCS.LIST>',
+                    '       <DUTYHEADDETAILS.LIST>       </DUTYHEADDETAILS.LIST>',
+                    '       <EXCISEDUTYHEADDETAILS.LIST>       </EXCISEDUTYHEADDETAILS.LIST>',
+                    '       <RATEDETAILS.LIST>       </RATEDETAILS.LIST>',
+                    '       <SUMMARYALLOCS.LIST>       </SUMMARYALLOCS.LIST>',
+                    '       <STPYMTDETAILS.LIST>       </STPYMTDETAILS.LIST>',
+                    '       <EXCISEPAYMENTALLOCATIONS.LIST>       </EXCISEPAYMENTALLOCATIONS.LIST>',
+                    '       <TAXBILLALLOCATIONS.LIST>       </TAXBILLALLOCATIONS.LIST>',
+                    '       <TAXOBJECTALLOCATIONS.LIST>       </TAXOBJECTALLOCATIONS.LIST>',
+                    '       <TDSEXPENSEALLOCATIONS.LIST>       </TDSEXPENSEALLOCATIONS.LIST>',
+                    '       <VATSTATUTORYDETAILS.LIST>       </VATSTATUTORYDETAILS.LIST>',
+                    '       <COSTTRACKALLOCATIONS.LIST>       </COSTTRACKALLOCATIONS.LIST>',
+                    '       <REFVOUCHERDETAILS.LIST>       </REFVOUCHERDETAILS.LIST>',
+                    '       <INVOICEWISEDETAILS.LIST>       </INVOICEWISEDETAILS.LIST>',
+                    '       <VATITCDETAILS.LIST>       </VATITCDETAILS.LIST>',
+                    '       <ADVANCETAXDETAILS.LIST>       </ADVANCETAXDETAILS.LIST>',
+                    '      </ALLLEDGERENTRIES.LIST>',
+                ])
             
             # Add Bank/Payment ALLLEDGERENTRIES
             xml_lines.extend([
@@ -2519,8 +2451,10 @@ class ExcelProcessor:
             # Extract ZSSF employee data
             employee_data = self.extract_zssf_employee_data(df, employee_start_row)
             
-            # Calculate totals
-            total_zssf = sum(emp.get('zssf_7', 0) + emp.get('zssf_14', 0) + emp.get('zssf_21', 0) for emp in employee_data)
+            # Calculate totals - Column E (7%) and Column F (13%)
+            total_zssf_7 = sum(emp.get('zssf_7', 0) for emp in employee_data)
+            total_zssf_13 = sum(emp.get('zssf_13', 0) for emp in employee_data)
+            total_zssf = total_zssf_7 + total_zssf_13
             
             # Prepare result
             result = {
@@ -2533,12 +2467,14 @@ class ExcelProcessor:
                 "employee_data": employee_data,
                 "total_employees": len(employee_data),
                 "total_zssf": total_zssf,
+                "total_zssf_7": total_zssf_7,   # Column E - ZSSF @ 7%
+                "total_zssf_13": total_zssf_13, # Column F - ZSSF @ 13%
                 "total_rows": len(df),
                 "total_columns": len(df.columns),
                 "employee_data_start_row": employee_start_row + 1
             }
             
-            print(f"✅ ZSSF processing completed: {len(employee_data)} employees, Total ZSSF: ₹{total_zssf:,.2f}")
+            print(f"✅ ZSSF processing completed: {len(employee_data)} employees, ZSSF @ 7%: ₹{total_zssf_7:,.2f}, ZSSF @ 13%: ₹{total_zssf_13:,.2f}, Total: ₹{total_zssf:,.2f}")
             return result
             
         except Exception as e:
@@ -2592,149 +2528,174 @@ class ExcelProcessor:
             return {"error": f"Error processing ZHSF sheet: {str(e)}", "success": False}
 
     def extract_zssf_employee_data(self, df: pd.DataFrame, employee_start_row: int) -> List[Dict[str, Any]]:
-        """Extract ZSSF employee data from the DataFrame."""
+        """Extract ZSSF employee data from the DataFrame - FULLY DYNAMIC."""
         employee_data = []
+        zssf_columns = []  # Store ZSSF column info: [(col_idx, ledger_name, field_key), ...]
         
         try:
-            # Get header row
+            # Get header row (Row 7)
             header_row = df.iloc[employee_start_row]
             
-            # Create column mapping for ZSSF sheet
-            column_mapping = {}
+            employee_name_idx = None
+            
+            # Find EMPLOYEE NAME column and all ZSSF @ X% columns dynamically
             for idx, header in enumerate(header_row):
                 if not pd.isna(header):
-                    header_str = str(header).strip().upper()
-                    if 'EMPLOYEE' in header_str and 'NAME' in header_str:
-                        column_mapping['employee_name'] = idx
-                    elif 'ZSSF' in header_str and '7%' in header_str:
-                        column_mapping['zssf_7'] = idx
-                    elif 'ZSSF' in header_str and '14%' in header_str:
-                        column_mapping['zssf_14'] = idx
-                    elif '@' in header_str and '21%' in header_str:
-                        column_mapping['zssf_21'] = idx
-                    elif header_str == 'REMARKS':
-                        column_mapping['remarks'] = idx
-                    elif 'ZSSF' in header_str and 'NO' in header_str:
-                        column_mapping['zssf_no'] = idx
-                    elif header_str == 'SALARY':
-                        column_mapping['salary'] = idx
-                    elif header_str == 'NAME':
-                        column_mapping['name'] = idx
+                    header_str = str(header).strip()
+                    
+                    # Find employee name column
+                    if 'EMPLOYEE' in header_str.upper() and 'NAME' in header_str.upper():
+                        employee_name_idx = idx
+                        print(f"✅ Found Employee Name at column {idx}")
+                    
+                    # Find ZSSF @ X% columns dynamically
+                    elif 'ZSSF' in header_str.upper() and '@' in header_str and '%' in header_str:
+                        # Extract the ledger name exactly as it appears in Excel
+                        ledger_name = header_str.strip()
+                        field_key = f"zssf_col_{idx}"  # Unique field key
+                        zssf_columns.append((idx, ledger_name, field_key))
+                        print(f"✅ Found ZSSF column at {idx}: '{ledger_name}'")
             
-            print(f"🎯 ZSSF Column mapping: {column_mapping}")
+            if employee_name_idx is None:
+                print("❌ Could not find EMPLOYEE NAME column")
+                return []
             
-            # Extract data rows
+            if not zssf_columns:
+                print("❌ Could not find any ZSSF @ X% columns")
+                return []
+            
+            print(f"📊 Found {len(zssf_columns)} ZSSF columns: {[name for _, name, _ in zssf_columns]}")
+            
+            # Extract data rows (skip header row)
             data_rows = df.iloc[employee_start_row + 1:]
             
-            for idx, row in data_rows.iterrows():
+            for row_idx, row in data_rows.iterrows():
                 # Skip empty rows
                 if row.isna().all():
                     continue
                 
-                employee_record = {}
+                # Get employee name
+                emp_name = row.iloc[employee_name_idx] if employee_name_idx < len(row) else None
+                if pd.isna(emp_name) or str(emp_name).strip() == '':
+                    continue
                 
-                # Extract employee data using column mapping
-                for field, col_idx in column_mapping.items():
+                employee_record = {'employee_name': str(emp_name).strip()}
+                
+                # Extract all ZSSF column values
+                for col_idx, ledger_name, field_key in zssf_columns:
                     if col_idx < len(row):
                         value = row.iloc[col_idx]
-                        if not pd.isna(value):
-                            if field in ['zssf_7', 'zssf_14', 'zssf_21', 'salary']:
-                                # Convert to numeric
-                                try:
-                                    employee_record[field] = float(value)
-                                except (ValueError, TypeError):
-                                    employee_record[field] = 0
-                            else:
-                                # Ensure string fields are properly converted - safe handling
-                                str_value = str(value).strip() if value is not None and str(value).strip() != 'nan' else ""
-                                employee_record[field] = str_value
-                        else:
-                            employee_record[field] = 0 if field in ['zssf_7', 'zssf_14', 'zssf_21', 'salary'] else ""
+                        try:
+                            employee_record[field_key] = float(value) if not pd.isna(value) else 0
+                        except:
+                            employee_record[field_key] = 0
+                    else:
+                        employee_record[field_key] = 0
                 
-                # Ensure employee_name is always a valid string
-                if 'employee_name' in employee_record and not employee_record['employee_name']:
-                    employee_record['employee_name'] = f"Employee_{idx}"
-                
-                # Only add if we have essential data
-                total_zssf = employee_record.get('zssf_7', 0) + employee_record.get('zssf_14', 0) + employee_record.get('zssf_21', 0)
-                if employee_record.get('employee_name') and total_zssf > 0:
+                # Only add if employee has any ZSSF value
+                total_zssf = sum(employee_record.get(field_key, 0) for _, _, field_key in zssf_columns)
+                if total_zssf > 0:
                     employee_data.append(employee_record)
-                    emp_name = employee_record.get('employee_name', 'Unknown')
-                    print(f"Added ZSSF employee: {emp_name}, ZSSF 7%: {employee_record.get('zssf_7', 0)}, ZSSF 14%: {employee_record.get('zssf_14', 0)}, ZSSF 21%: {employee_record.get('zssf_21', 0)}")
+                    print(f"Added: {emp_name}, Total ZSSF: {total_zssf}")
+            
+            # Store zssf_columns info in a way that can be accessed later
+            if employee_data:
+                # Add metadata to first employee record
+                employee_data[0]['_zssf_columns_'] = zssf_columns
             
         except Exception as e:
             print(f"❌ Error extracting ZSSF employee data: {str(e)}")
+            import traceback
+            traceback.print_exc()
         
         return employee_data
 
     def extract_zhsf_employee_data(self, df: pd.DataFrame, employee_start_row: int) -> List[Dict[str, Any]]:
-        """Extract ZHSF employee data from the DataFrame."""
+        """Extract ZHSF employee data from the DataFrame - FULLY DYNAMIC."""
         employee_data = []
+        zhsf_columns = []  # Store ZHSF column info: [(col_idx, ledger_name, field_key), ...]
         
         try:
-            # Get header row
+            # Get header row (Row 3 or 4)
             header_row = df.iloc[employee_start_row]
             
-            # Create column mapping for ZHSF sheet
-            column_mapping = {}
+            employee_name_idx = None
+            
+            # Find EMPLOYEE NAME column and all ZHSF columns dynamically
             for idx, header in enumerate(header_row):
                 if not pd.isna(header):
-                    header_str = str(header).strip().upper()
-                    if 'EMPLOYEE' in header_str and 'NAME' in header_str:
-                        column_mapping['employee_name'] = idx
-                    elif 'EMPLOYEE' in header_str and '3.5%' in header_str:
-                        column_mapping['employee_35'] = idx
-                    elif 'TWA' in header_str and '3.5%' in header_str:
-                        column_mapping['twa_35'] = idx
-                    elif header_str == 'SALARY':
-                        column_mapping['salary'] = idx
-                    elif header_str == 'TOTAL':
-                        column_mapping['total'] = idx
-                    elif 'EMPL' in header_str and 'NO' in header_str:
-                        column_mapping['empl_no'] = idx
+                    header_str = str(header).strip()
+                    
+                    # Find employee name column
+                    if 'EMPLOYEE' in header_str.upper() and 'NAME' in header_str.upper():
+                        employee_name_idx = idx
+                        print(f"✅ Found Employee Name at column {idx}")
+                    
+                    # Find columns with "3.5%" or "@" and "%" dynamically
+                    elif ('3.5%' in header_str or '@' in header_str) and '%' in header_str:
+                        # Check if it contains "Employee" or "TWA" to build proper ledger name
+                        if 'EMPLOYEE' in header_str.upper():
+                            ledger_name = "ZHSF Employee @ 3.5%"
+                        elif 'TWA' in header_str.upper():
+                            ledger_name = "ZHSF TWA @ 3.5%"
+                        else:
+                            # Generic: use column header as-is
+                            ledger_name = header_str.strip()
+                        
+                        field_key = f"zhsf_col_{idx}"  # Unique field key
+                        zhsf_columns.append((idx, ledger_name, field_key))
+                        print(f"✅ Found ZHSF column at {idx}: '{header_str}' → Ledger: '{ledger_name}'")
             
-            print(f"🎯 ZHSF Column mapping: {column_mapping}")
+            if employee_name_idx is None:
+                print("❌ Could not find EMPLOYEE NAME column")
+                return []
             
-            # Extract data rows
+            if not zhsf_columns:
+                print("❌ Could not find any ZHSF columns with 3.5%")
+                return []
+            
+            print(f"📊 Found {len(zhsf_columns)} ZHSF columns: {[name for _, name, _ in zhsf_columns]}")
+            
+            # Extract data rows (skip header row)
             data_rows = df.iloc[employee_start_row + 1:]
             
-            for idx, row in data_rows.iterrows():
+            for row_idx, row in data_rows.iterrows():
                 # Skip empty rows
                 if row.isna().all():
                     continue
                 
-                employee_record = {}
+                # Get employee name
+                emp_name = row.iloc[employee_name_idx] if employee_name_idx < len(row) else None
+                if pd.isna(emp_name) or str(emp_name).strip() == '':
+                    continue
                 
-                # Extract employee data using column mapping
-                for field, col_idx in column_mapping.items():
+                employee_record = {'employee_name': str(emp_name).strip()}
+                
+                # Extract all ZHSF column values
+                for col_idx, ledger_name, field_key in zhsf_columns:
                     if col_idx < len(row):
                         value = row.iloc[col_idx]
-                        if not pd.isna(value):
-                            if field in ['employee_35', 'twa_35', 'salary', 'total']:
-                                # Convert to numeric
-                                try:
-                                    employee_record[field] = float(value)
-                                except (ValueError, TypeError):
-                                    employee_record[field] = 0
-                            else:
-                                # Ensure string fields are properly converted - safe handling
-                                str_value = str(value).strip() if value is not None and str(value).strip() != 'nan' else ""
-                                employee_record[field] = str_value
-                        else:
-                            employee_record[field] = 0 if field in ['employee_35', 'twa_35', 'salary', 'total'] else ""
+                        try:
+                            employee_record[field_key] = float(value) if not pd.isna(value) else 0
+                        except:
+                            employee_record[field_key] = 0
+                    else:
+                        employee_record[field_key] = 0
                 
-                # Ensure employee_name is always a valid string
-                if 'employee_name' in employee_record and not employee_record['employee_name']:
-                    employee_record['employee_name'] = f"Employee_{idx}"
-                
-                # Only add if we have essential data
-                total_zhsf = employee_record.get('employee_35', 0) + employee_record.get('twa_35', 0)
-                if employee_record.get('employee_name') and total_zhsf > 0:
+                # Only add if employee has any ZHSF value
+                total_zhsf = sum(employee_record.get(field_key, 0) for _, _, field_key in zhsf_columns)
+                if total_zhsf > 0:
                     employee_data.append(employee_record)
-                    emp_name = employee_record.get('employee_name', 'Unknown')
-                    print(f"Added ZHSF employee: {emp_name}, Employee 3.5%: {employee_record.get('employee_35', 0)}, TWA 3.5%: {employee_record.get('twa_35', 0)}")
+                    print(f"Added: {emp_name}, Total ZHSF: {total_zhsf}")
+            
+            # Store zhsf_columns info in a way that can be accessed later
+            if employee_data:
+                # Add metadata to first employee record
+                employee_data[0]['_zhsf_columns_'] = zhsf_columns
             
         except Exception as e:
             print(f"❌ Error extracting ZHSF employee data: {str(e)}")
+            import traceback
+            traceback.print_exc()
         
         return employee_data
