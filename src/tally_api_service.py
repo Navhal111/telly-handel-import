@@ -20,6 +20,62 @@ class TallyApiService:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
+    def check_tally_version(self) -> Dict[str, any]:
+        """
+        Check if Tally Prime or Tally ERP is running.
+        
+        Returns:
+            Dict containing version info: {"is_prime": bool, "version": str, "success": bool}
+        """
+        try:
+            self.logger.info("Checking Tally version...")
+            
+            # Make simple GET request to check response
+            response = requests.get(self.base_url, timeout=10)
+            
+            if response.status_code == 200:
+                response_text = response.text.strip()
+                
+                # Check if response contains "TallyPrime"
+                if "TallyPrime" in response_text or "Tally Prime" in response_text:
+                    self.logger.info("✅ Detected: Tally Prime")
+                    return {
+                        "success": True,
+                        "is_prime": True,
+                        "version": "Tally Prime",
+                        "message": "TallyPrime Server is Running"
+                    }
+                else:
+                    self.logger.info("✅ Detected: Tally ERP")
+                    return {
+                        "success": True,
+                        "is_prime": False,
+                        "version": "Tally ERP 9",
+                        "message": "Tally Server is Running"
+                    }
+            else:
+                return {
+                    "success": False,
+                    "is_prime": False,
+                    "version": "Unknown",
+                    "error": f"HTTP {response.status_code}"
+                }
+                
+        except requests.exceptions.ConnectionError:
+            return {
+                "success": False,
+                "is_prime": False,
+                "version": "Unknown",
+                "error": "Cannot connect to Tally. Please ensure Tally is running."
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "is_prime": False,
+                "version": "Unknown",
+                "error": str(e)
+            }
+    
     def get_server_info(self) -> Dict[str, any]:
         """
         Get basic information about the Tally instance.

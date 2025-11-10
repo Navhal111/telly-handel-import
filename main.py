@@ -14,6 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.excel_processor import ExcelProcessor
 from src.tally_api_service import TallyApiService
+from src.company_config import CompanyConfigManager
 
 
 class AccountSelectionDialog:
@@ -280,8 +281,13 @@ class ModernExcelProcessor:
         # Initialize Excel processor and API service
         self.processor = ExcelProcessor()
         self.api_service = TallyApiService()
+        self.company_config = CompanyConfigManager()  # For Tally Prime company management
         self.selected_company = None
         self.selected_date = datetime.now().strftime("%Y-%m-%d")  # Default to today's date
+        
+        # Tally version info (will be detected)
+        self.tally_version = "Tally"
+        self.is_tally_prime = False
         
         # Show company selection screen first
         self.show_company_selection_screen()
@@ -508,6 +514,9 @@ class ModernExcelProcessor:
         )
         self.company_status_label.pack()
         
+        # Store reference to selection frame for adding CRUD buttons later
+        self.company_selection_frame = selection_frame
+        
         # Load companies automatically
         self.load_companies()
         
@@ -515,27 +524,65 @@ class ModernExcelProcessor:
         self.company_dropdown.bind('<<ComboboxSelected>>', self.on_company_selected)
     
     def load_companies(self):
-        """Load companies from Tally API."""
+        """Check Tally version and load companies accordingly."""
         # Disable buttons during loading
-        self.refresh_btn.configure(state='disabled', text='Loading...')
+        self.refresh_btn.configure(state='disabled', text='Checking...')
         self.proceed_btn.configure(state='disabled')
-        self.company_status_label.configure(text="🔄 Connecting to Tally...", fg=self.colors['secondary'])
-        self.company_var.set("Loading companies...")
+        self.company_status_label.configure(text="🔄 Detecting Tally version...", fg=self.colors['secondary'])
+        self.company_var.set("Checking Tally version...")
         self.root.update()
         
-        # Load companies in background thread
+        # Check version and load companies in background thread
         thread = threading.Thread(target=self._load_companies_background)
         thread.daemon = True
         thread.start()
     
     def _load_companies_background(self):
-        """Load companies in background thread."""
+        """Check Tally version and load companies in background thread."""
         try:
-            result = self.api_service.get_companies()
+            # First, check Tally version
+            version_info = self.api_service.check_tally_version()
+            
+            if not version_info.get("success", False):
+                # Cannot connect to Tally
+                error_result = {
+                    "success": False, 
+                    "error": version_info.get("error", "Cannot connect to Tally"),
+                    "companies": [],
+                    "is_prime": False
+                }
+                self.root.after(0, self._handle_companies_result, error_result)
+                return
+            
+            # Store version info
+            is_prime = version_info.get("is_prime", False)
+            version_name = version_info.get("version", "Unknown")
+            
+            if is_prime:
+                # Tally Prime - cannot get company list via API
+                result = {
+                    "success": True,
+                    "is_prime": True,
+                    "version": version_name,
+                    "companies": [],  # Empty list for manual entry
+                    "message": "Tally Prime detected - Please enter company name manually"
+                }
+            else:
+                # Tally ERP - get company list
+                result = self.api_service.get_companies()
+                result["is_prime"] = False
+                result["version"] = version_name
+            
             # Update UI in main thread
             self.root.after(0, self._handle_companies_result, result)
+            
         except Exception as e:
-            error_result = {"success": False, "error": str(e), "companies": []}
+            error_result = {
+                "success": False, 
+                "error": str(e), 
+                "companies": [],
+                "is_prime": False
+            }
             self.root.after(0, self._handle_companies_result, error_result)
     
     def _handle_companies_result(self, result):
@@ -554,27 +601,70 @@ class ModernExcelProcessor:
             return
         
         if result.get("success", False):
+            is_prime = result.get("is_prime", False)
+            version = result.get("version", "Unknown")
             companies = result.get("companies", [])
-            if companies:
-                # Populate dropdown
+            
+            # Store version info for later use
+            self.tally_version = version
+            self.is_tally_prime = is_prime
+            
+            if is_prime:
+                # TALLY PRIME - Load saved companies from local config
                 try:
-                    self.company_dropdown['values'] = companies
-                    self.company_var.set("-- Please Select a Company --")
-                    self.company_status_label.configure(
-                        text=f"✅ Successfully loaded {len(companies)} companies from Tally",
-                        fg=self.colors['success']
-                    )
+                    saved_companies = self.company_config.get_companies()
+                    
+                    if saved_companies:
+                        # Show dropdown with saved companies
+                        self.company_dropdown.configure(values=saved_companies, state="readonly")
+                        self.company_var.set("-- Select from Saved Companies --")
+                        
+                        # Update status
+                        self.company_status_label.configure(
+                            text=f"✅ {version} Detected - {len(saved_companies)} saved company(ies) | Use buttons below to manage",
+                            fg=self.colors['success']
+                        )
+                    else:
+                        # No saved companies - show empty dropdown
+                        self.company_dropdown.configure(values=[], state="readonly")
+                        self.company_var.set("No companies saved - Click Add button")
+                        
+                        # Update status
+                        self.company_status_label.configure(
+                            text=f"✅ {version} Detected - No companies saved yet",
+                            fg=self.colors['warning']
+                        )
+                    
+                    # Add CRUD buttons for Tally Prime (if not already added)
+                    if not hasattr(self, 'prime_crud_buttons_added'):
+                        self._add_prime_crud_buttons()
+                        self.prime_crud_buttons_added = True
+                    
                 except:
                     pass
+                    
             else:
-                try:
-                    self.company_var.set("No companies available")
-                    self.company_status_label.configure(
-                        text="⚠️ No companies found in your Tally database",
-                        fg=self.colors['warning']
-                    )
-                except:
-                    pass
+                # TALLY ERP - Dropdown selection
+                if companies:
+                    try:
+                        self.company_dropdown['values'] = companies
+                        self.company_dropdown.configure(state="readonly")
+                        self.company_var.set("-- Please Select a Company --")
+                        self.company_status_label.configure(
+                            text=f"✅ {version} Detected - Found {len(companies)} companies",
+                            fg=self.colors['success']
+                        )
+                    except:
+                        pass
+                else:
+                    try:
+                        self.company_var.set("No companies available")
+                        self.company_status_label.configure(
+                            text=f"⚠️ {version} - No companies found in database",
+                            fg=self.colors['warning']
+                        )
+                    except:
+                        pass
         else:
             error_msg = result.get("error", "Unknown error")
             try:
@@ -588,13 +678,37 @@ class ModernExcelProcessor:
     
 
     
+    def on_company_typed(self, event=None):
+        """Handle company name typing for Tally Prime."""
+        typed_text = self.company_var.get().strip()
+        
+        # Clear placeholder text on first key
+        if typed_text == "Type your company name here...":
+            self.company_dropdown.delete(0, tk.END)
+            return
+        
+        # Enable proceed if user has typed something
+        if typed_text and len(typed_text) > 0:
+            self.selected_company = typed_text
+            self.proceed_btn.configure(state='normal')
+            self.company_status_label.configure(
+                text=f"✅ Company name entered: {typed_text} - Ready to proceed",
+                fg=self.colors['success']
+            )
+        else:
+            self.selected_company = None
+            self.proceed_btn.configure(state='disabled')
+    
     def on_company_selected(self, event=None):
-        """Handle company selection."""
+        """Handle company selection from dropdown (both Tally ERP and Prime)."""
         selected = self.company_var.get()
         invalid_selections = [
             "Loading companies...", 
-            "-- Please Select a Company --", 
-            "No companies available", 
+            "Checking Tally version...",
+            "-- Please Select a Company --",
+            "-- Select from Saved Companies --",
+            "No companies available",
+            "No companies saved - Click Add button",
             "Connection failed - Click Refresh"
         ]
         
@@ -602,13 +716,164 @@ class ModernExcelProcessor:
             self.selected_company = selected
             self.proceed_btn.configure(state='normal')
             # Update status to show selection
+            version_text = getattr(self, 'tally_version', 'Tally')
             self.company_status_label.configure(
-                text=f"🏢 Selected: {selected} - Ready to proceed",
+                text=f"🏢 Selected: {selected} ({version_text}) - Ready to proceed",
                 fg=self.colors['primary']
             )
         else:
             self.selected_company = None
             self.proceed_btn.configure(state='disabled')
+    
+    def _add_prime_crud_buttons(self):
+        """Add CRUD buttons for Tally Prime company management."""
+        try:
+            # Create CRUD buttons container below dropdown
+            crud_frame = tk.Frame(self.company_selection_frame, bg=self.colors['white'])
+            crud_frame.pack(pady=(15, 0), fill=tk.X)
+            
+            # Label
+            crud_label = tk.Label(
+                crud_frame,
+                text="📝 Manage Companies:",
+                font=('Arial', 11, 'bold'),
+                bg=self.colors['white'],
+                fg=self.colors['dark']
+            )
+            crud_label.pack(pady=(0, 10))
+            
+            # Buttons container
+            crud_buttons = tk.Frame(crud_frame, bg=self.colors['white'])
+            crud_buttons.pack()
+            
+            # Add button
+            add_btn = ttk.Button(
+                crud_buttons,
+                text="➕ Add Company",
+                command=self.add_company_dialog,
+                style='Success.TButton'
+            )
+            add_btn.pack(side=tk.LEFT, padx=(0, 10))
+            
+            # Delete button
+            delete_btn = ttk.Button(
+                crud_buttons,
+                text="🗑️ Delete",
+                command=self.delete_company_dialog,
+                style='Secondary.TButton'
+            )
+            delete_btn.pack(side=tk.LEFT, padx=(0, 10))
+            
+            # Clear All button
+            clear_btn = ttk.Button(
+                crud_buttons,
+                text="🧹 Clear All",
+                command=self.clear_all_companies,
+                style='Secondary.TButton'
+            )
+            clear_btn.pack(side=tk.LEFT)
+            
+        except Exception as e:
+            print(f"Error adding CRUD buttons: {e}")
+    
+    def add_company_dialog(self):
+        """Show dialog to add a new company."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Company")
+        dialog.geometry("400x180")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - 400) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 180) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Content
+        frame = tk.Frame(dialog, bg=self.colors['white'], padx=20, pady=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        title = tk.Label(
+            frame,
+            text="➕ Add New Company",
+            font=('Arial', 14, 'bold'),
+            bg=self.colors['white'],
+            fg=self.colors['primary']
+        )
+        title.pack(pady=(0, 15))
+        
+        tk.Label(
+            frame,
+            text="Enter company name:",
+            font=('Arial', 11),
+            bg=self.colors['white']
+        ).pack(anchor=tk.W, pady=(0, 5))
+        
+        company_entry = ttk.Entry(frame, font=('Arial', 12), width=35)
+        company_entry.pack(pady=(0, 20))
+        company_entry.focus()
+        
+        # Buttons
+        btn_frame = tk.Frame(frame, bg=self.colors['white'])
+        btn_frame.pack()
+        
+        def save_company():
+            company_name = company_entry.get().strip()
+            if company_name:
+                if self.company_config.add_company(company_name):
+                    messagebox.showinfo("Success", f"Company '{company_name}' added successfully!")
+                    dialog.destroy()
+                    # Refresh dropdown
+                    self.load_companies()
+                else:
+                    messagebox.showwarning("Already Exists", f"Company '{company_name}' already exists!")
+            else:
+                messagebox.showerror("Error", "Please enter a company name!")
+        
+        ttk.Button(
+            btn_frame,
+            text="💾 Save",
+            command=save_company,
+            style='Success.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(
+            btn_frame,
+            text="Cancel",
+            command=dialog.destroy,
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT)
+        
+        company_entry.bind('<Return>', lambda e: save_company())
+    
+    def delete_company_dialog(self):
+        """Show dialog to delete selected company."""
+        selected = self.company_var.get()
+        
+        if not selected or selected in ["-- Select from Saved Companies --", "No companies saved - Click Add button"]:
+            messagebox.showwarning("No Selection", "Please select a company to delete!")
+            return
+        
+        # Confirm deletion
+        if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete '{selected}'?"):
+            if self.company_config.delete_company(selected):
+                messagebox.showinfo("Success", f"Company '{selected}' deleted successfully!")
+                # Refresh dropdown
+                self.load_companies()
+            else:
+                messagebox.showerror("Error", f"Failed to delete '{selected}'!")
+    
+    def clear_all_companies(self):
+        """Clear all saved companies after confirmation."""
+        if messagebox.askyesno("Confirm Clear All", "Are you sure you want to delete ALL saved companies?\n\nThis cannot be undone!"):
+            if self.company_config.clear_all():
+                messagebox.showinfo("Success", "All companies cleared successfully!")
+                # Refresh dropdown
+                self.load_companies()
+            else:
+                messagebox.showerror("Error", "Failed to clear companies!")
     
     def proceed_to_main(self):
         """Proceed to main application with selected company."""
@@ -671,9 +936,11 @@ class ModernExcelProcessor:
         )
         main_title.pack(anchor=tk.W)
         
+        # Show Tally version if available
+        tally_version_text = getattr(self, 'tally_version', 'Tally')
         subtitle = tk.Label(
             left_side,
-            text="Upload Excel files and generate Tally-compatible XML",
+            text=f"Upload Excel files and generate {tally_version_text}-compatible XML",
             font=('Arial', 8),
             bg=banner_color,
             fg=self.colors['white']
@@ -683,6 +950,18 @@ class ModernExcelProcessor:
         # Right side - Company info - COMPACT
         right_side = tk.Frame(banner_content, bg=banner_color)
         right_side.pack(side=tk.RIGHT, padx=(0, 10))
+        
+        # Show Tally version badge
+        version_badge = tk.Label(
+            right_side,
+            text=f"⚙️ {tally_version_text}",
+            font=('Arial', 8, 'bold'),
+            bg=self.colors['white'],
+            fg=banner_color,
+            padx=6,
+            pady=2
+        )
+        version_badge.pack(pady=(0, 3))
         
         company_info = tk.Label(
             right_side,
